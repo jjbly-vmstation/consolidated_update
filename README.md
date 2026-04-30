@@ -62,12 +62,16 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
 │   ├── jellyfin/           # Media server (storagenodet3500, port 30096)
 │   ├── nextcloud/          # File sharing — HTTP until AD DC SSL done
 │   └── monitoring/         # Prometheus · Grafana · Loki · Promtail · exporters
+├── scripts/
+│   └── image-sync.sh       # TODO: pull all images → push to local OCI registry
 └── docs/
     ├── BOOTSTRAP.md        # First-time setup walkthrough
     ├── WAKE_ON_LAN.md
     ├── CISCO_SWITCH.md
     ├── WINDOWS_DC.md       # AD DC setup, WinRM, DNS records
-    └── NEXTCLOUD_SSL.md    # TODO: AD CS cert integration
+    ├── NEXTCLOUD_SSL.md    # TODO: AD CS cert integration
+    ├── CICD.md             # Self-hosted CI/CD plan (GitHub Actions runner → Gitea Actions)
+    └── OFFLINE.md          # Offline/air-gap redeployment plan (5 phases)
 ```
 
 ## Outstanding TODOs
@@ -75,6 +79,14 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
 ### CI/CD (next priority)
 6. **`ansible/playbooks/cicd.yml`** — install GitHub Actions self-hosted runner on masternode as a systemd service. Run this manually after `bootstrap.yml` and `masternode.yml` as a one-time prerequisite. See `docs/CICD.md` for the full plan, bootstrap sequence, and playbook skeleton.
 7. **`.github/workflows/ci.yml`** — yamllint + ansible-lint + `kubectl kustomize` validation on every PR, targeting the self-hosted runner (`runs-on: [self-hosted, masternode]`)
+
+### Offline / Air-Gap Capability
+See [`docs/OFFLINE.md`](docs/OFFLINE.md) for the full plan. Five implementation phases:
+- **Phase 1** — `ansible/playbooks/gitea.yml` + `ansible/playbooks/cicd.yml` (Gitea server + Gitea Actions runner — replaces GitHub for offline operation)
+- **Phase 2** — `ansible/playbooks/registry.yml` + `scripts/image-sync.sh` + `newName` overrides in all `kustomization.yaml` files (local OCI registry on masternode :5000)
+- **Phase 3** — `ansible/playbooks/apt-mirror.yml` (local Kubernetes + Docker + Debian apt mirror on storagenodet3500 :8080)
+- **Phase 4** — Pre-download binaries (node_exporter, act_runner) to `files/binaries/` or local HTTP mirror
+- **Phase 5** — `ansible-galaxy collection download` → commit `ansible/collections/` for offline install
 
 ### Applications
 1. **Nextcloud SSL** — obtain cert from AD CS, create TLS secret — see `docs/NEXTCLOUD_SSL.md`
