@@ -1,0 +1,24 @@
+---
+cluster_name: vmstation-cluster
+cluster_domain: vmstation.local
+
+# AD DC at 192.168.4.62 (homelab / WSDC-Homelab) is primary DNS and NTP
+ntp_servers:
+  - 192.168.4.62
+  - 0.pool.ntp.org
+
+dns_servers:
+  - 192.168.4.62
+  - 8.8.8.8
+
+k8s_version: "1.29"
+container_runtime: containerd
+pod_network_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12"
+control_plane_endpoint: "192.168.4.63:6443"
+cni_plugin: calico
+
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+ansible_python_interpreter: /usr/bin/python3
+
+ansible_managed: "Managed by Ansible - do not edit directly"

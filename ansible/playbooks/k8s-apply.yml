@@ -1,0 +1,70 @@
+---
+# k8s-apply.yml — Apply all Kustomize manifests to the cluster
+# Runs kubectl apply -k for each app directory in kustomize/.
+# Must be run on masternode (has kubeconfig at /etc/kubernetes/admin.conf).
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags jellyfin
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
+
+- name: Apply Kubernetes manifests via Kustomize
+  hosts: control_plane
+  become: false
+  gather_facts: false
+
+  vars:
+    kubeconfig: /etc/kubernetes/admin.conf
+    repo_root: "{{ playbook_dir }}/../.."
+
+  tasks:
+    - name: Apply monitoring stack
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/monitoring
+      changed_when: true
+      tags: [monitoring]
+
+    - name: Apply Jellyfin
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/jellyfin
+      changed_when: true
+      tags: [jellyfin]
+
+    - name: Apply Nextcloud
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/nextcloud
+      changed_when: true
+      tags: [nextcloud]
+
+    - name: Wait for monitoring pods to be ready
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} -n monitoring wait pod --all --for=condition=Ready --timeout=300s
+      changed_when: false
+      failed_when: false
+      tags: [monitoring, wait]
+
+    - name: Wait for Jellyfin pod to be ready
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} -n jellyfin wait pod --all --for=condition=Ready --timeout=300s
+      changed_when: false
+      failed_when: false
+      tags: [jellyfin, wait]
+
+    - name: Wait for Nextcloud pods to be ready
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} -n nextcloud wait pod --all --for=condition=Ready --timeout=300s
+      changed_when: false
+      failed_when: false
+      tags: [nextcloud, wait]
+
+    - name: Show pod status
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} get pods -A
+      changed_when: false
+      register: pod_status
+      tags: [status]
+
+    - name: Display pod status
+      ansible.builtin.debug:
+        msg: "{{ pod_status.stdout_lines }}"
+      tags: [status]

@@ -1,0 +1,34 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-html-pvc
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: ""
+  volumeName: nextcloud-html-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-mariadb-pvc
+  namespace: nextcloud
+  labels:
+    app.kubernetes.io/name: nextcloud
+    app.kubernetes.io/component: mariadb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: ""
+  volumeName: nextcloud-mariadb-pv

@@ -1,0 +1,41 @@
+# VMStation Monitoring Stack
+# Usage: kubectl apply -k kustomize/monitoring/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - namespace.yaml
+  - pv.yaml
+  - pvc.yaml
+  - prometheus/rbac.yaml
+  - prometheus/configmap.yaml
+  - prometheus/deployment.yaml
+  - prometheus/service.yaml
+  - grafana/configmap.yaml
+  - grafana/deployment.yaml
+  - grafana/service.yaml
+  - loki/configmap.yaml
+  - loki/deployment.yaml
+  - loki/service.yaml
+  - promtail/rbac.yaml
+  - promtail/configmap.yaml
+  - promtail/daemonset.yaml
+  - exporters/node-exporter.yaml
+  - exporters/kube-state-metrics.yaml
+  - exporters/blackbox-exporter.yaml
+
+images:
+  - name: prom/prometheus
+    newTag: v2.55.0
+  - name: grafana/grafana
+    newTag: "11.4.0"
+  - name: grafana/loki
+    newTag: "3.3.0"
+  - name: grafana/promtail
+    newTag: "3.3.0"
+  - name: prom/node-exporter
+    newTag: v1.6.1
+  - name: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    newTag: v2.10.0

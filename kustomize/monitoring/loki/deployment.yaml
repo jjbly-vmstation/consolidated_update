@@ -1,0 +1,189 @@
+---
+# Loki ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+---
+# Loki StatefulSet - Enterprise-Grade Configuration
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
+    vmstation.io/component: monitoring
+spec:
+  serviceName: loki
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/component: logging
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: loki
+        app.kubernetes.io/name: loki
+        app.kubernetes.io/component: logging
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3100"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: loki
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Node selection
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      # Priority class
+      priorityClassName: system-cluster-critical
+      
+      # Init container: Prepare directories and permissions
+      initContainers:
+      - name: init-loki-data
+        image: busybox:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          # Create required directories
+          mkdir -p /loki/chunks /loki/index /loki/index_cache /loki/wal /loki/compactor
+          
+          # Set ownership
+          chown -R 10001:10001 /loki
+          chmod -R 755 /loki
+          
+          echo "Loki data directories initialized"
+        volumeMounts:
+        - name: loki-data
+          mountPath: /loki
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+      
+      containers:
+      - name: loki
+        image: grafana/loki:2.9.4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3100
+          name: http-metrics
+          protocol: TCP
+        - containerPort: 9096
+          name: grpc
+          protocol: TCP
+        args:
+        - -config.file=/etc/loki/loki.yaml
+        - -target=all
+        
+        volumeMounts:
+        - name: loki-config
+          mountPath: /etc/loki
+          readOnly: true
+        - name: loki-data
+          mountPath: /loki
+        - name: tmp
+          mountPath: /tmp
+        
+        # Resource limits
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+            - ALL
+        
+        # Startup probe - allow slow startup
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 60
+        
+        # Readiness probe
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+            scheme: HTTP
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+      
+      volumes:
+      - name: loki-config
+        configMap:
+          name: loki-config
+          defaultMode: 0444
+      - name: tmp
+        emptyDir: {}
+      
+      terminationGracePeriodSeconds: 120
+  
+  # Persistent volume claim template
+  volumeClaimTemplates:
+  - metadata:
+      name: loki-data
+      labels:
+        app: loki
+    spec:
+      accessModes:
+      - ReadWriteMany
+      storageClassName: manual
+      resources:
+        requests:
+          storage: 20Gi

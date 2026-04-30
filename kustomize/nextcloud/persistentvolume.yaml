@@ -1,0 +1,54 @@
+---
+# Nextcloud HTML/config PV — pinned to storagenodet3500 (homelab is now Windows)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nextcloud-html-pv
+  labels:
+    app.kubernetes.io/name: nextcloud
+    app.kubernetes.io/component: storage
+spec:
+  capacity:
+    storage: 50Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  local:
+    path: /srv/nextcloud/nextcloud
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500
+---
+# MariaDB PV — pinned to storagenodet3500 (homelab is now Windows)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nextcloud-mariadb-pv
+  labels:
+    app.kubernetes.io/name: nextcloud
+    app.kubernetes.io/component: mariadb
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  local:
+    path: /srv/nextcloud/mariadb
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500

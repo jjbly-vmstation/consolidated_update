@@ -1,0 +1,260 @@
+---
+# Prometheus StatefulSet - Enterprise-Grade Configuration
+# Industry best practices:
+# - StatefulSet for stable network identity and ordered deployment
+# - Proper resource requests/limits for QoS
+# - Readiness/liveness probes for health monitoring
+# - Security context with non-root user
+# - Anti-affinity for HA (if replicas > 1)
+# - ConfigMap reload sidecar for zero-downtime config updates
+# - Persistent storage with proper volume management
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
+    vmstation.io/component: monitoring
+spec:
+  serviceName: prometheus
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+      app.kubernetes.io/component: monitoring
+  # Ordered deployment and termination
+  podManagementPolicy: OrderedReady
+  # Update strategy - rolling update
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        app.kubernetes.io/name: prometheus
+        app.kubernetes.io/component: monitoring
+      annotations:
+        # Prometheus scraping annotations
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: prometheus
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534  # nobody user
+        runAsGroup: 65534  # nobody group
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      # Node selection and scheduling
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      # Anti-affinity for HA (prevents multiple replicas on same node)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - prometheus
+              topologyKey: kubernetes.io/hostname
+      # Priority class for important workloads
+      priorityClassName: system-cluster-critical
+      
+      # Init container: Set proper permissions for data directory
+      initContainers:
+      - name: init-chown-data
+        image: busybox:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          chown -R 65534:65534 /prometheus
+          chmod -R 755 /prometheus
+        volumeMounts:
+        - name: prometheus-storage
+          mountPath: /prometheus
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+      
+      containers:
+      # Main Prometheus container
+      - name: prometheus
+        image: prom/prometheus:v2.48.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9090
+          name: web
+          protocol: TCP
+        args:
+        # Core configuration
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        
+        # Storage and retention
+        - '--storage.tsdb.retention.time=30d'
+        - '--storage.tsdb.retention.size=4GB'
+        - '--storage.tsdb.wal-compression'
+        
+        # Performance tuning
+        - '--query.timeout=2m'
+        - '--query.max-concurrency=20'
+        - '--query.max-samples=50000000'
+        
+        # Web interface
+        - '--web.console.libraries=/etc/prometheus/console_libraries'
+        - '--web.console.templates=/etc/prometheus/consoles'
+        - '--web.route-prefix=/'
+        - '--web.external-url=http://prometheus.monitoring.svc.cluster.local:9090'
+        
+        # Lifecycle and reload
+        - '--web.enable-lifecycle'
+        
+        # Federation and remote write
+        - '--web.enable-remote-write-receiver'
+        
+        # CORS for external access (Grafana, etc.)
+        - '--web.cors.origin=.*'
+        
+        # Admin API (use with caution in production)
+        - '--web.enable-admin-api'
+        
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: prometheus-rules
+          mountPath: /etc/prometheus/rules
+          readOnly: true
+        - name: prometheus-storage
+          mountPath: /prometheus
+        
+        # Resource limits and requests (QoS Guaranteed)
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        
+        # Security context for container
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+        
+        # Liveness probe - check if Prometheus is alive
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Readiness probe - check if Prometheus is ready to serve traffic
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup probe - allow slow startup without failing liveness
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: web
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 20  # 5 minutes to start
+      
+      # Sidecar: Config reloader for zero-downtime updates
+      - name: config-reloader
+        image: quay.io/prometheus-operator/prometheus-config-reloader:v0.70.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --listen-address=:8080
+        - --reload-url=http://localhost:9090/-/reload
+        - --watched-dir=/etc/prometheus
+        ports:
+        - containerPort: 8080
+          name: reloader-web
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+          readOnly: true
+      
+      # Volumes (ConfigMaps, emptyDirs, and secrets)
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+          defaultMode: 0444  # Read-only
+      - name: prometheus-rules
+        configMap:
+          name: prometheus-rules
+          defaultMode: 0444  # Read-only
+      
+      # Termination grace period for graceful shutdown
+      terminationGracePeriodSeconds: 120
+  
+  # Persistent Volume Claim template
+  volumeClaimTemplates:
+  - metadata:
+      name: prometheus-storage
+      labels:
+        app: prometheus
+    spec:
+      accessModes:
+      - ReadWriteMany
+      storageClassName: manual
+      resources:
+        requests:
+          storage: 25Gi

@@ -1,0 +1,88 @@
+---
+# Promtail DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: monitoring
+  labels:
+    app: promtail
+    app.kubernetes.io/name: promtail
+    app.kubernetes.io/component: logging
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
+    vmstation.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+      app.kubernetes.io/name: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+        app.kubernetes.io/name: promtail
+    spec:
+      serviceAccountName: promtail
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: promtail
+        image: grafana/promtail:2.9.2
+        imagePullPolicy: IfNotPresent
+        args:
+        - -config.file=/etc/promtail/promtail.yaml
+        ports:
+        - containerPort: 9080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/promtail
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: positions
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        # Readiness probe
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        # Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: promtail-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: positions
+        emptyDir: {}

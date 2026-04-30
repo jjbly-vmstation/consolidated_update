@@ -1,0 +1,28 @@
+---
+# Jellyfin Configuration PV (static hostPath, pinned to storagenodet3500)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jellyfin-config-pv
+  labels:
+    app: jellyfin
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: config
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  local:
+    path: /var/lib/jellyfin
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500

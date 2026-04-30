@@ -1,0 +1,206 @@
+---
+# Loki ConfigMap (anonymous access, enterprise configuration)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: monitoring
+  labels:
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+    vmstation.io/component: monitoring
+  annotations:
+    vmstation.io/anonymous-access: "true"
+data:
+  loki.yaml: |
+    # Loki Enterprise Configuration
+    # Target: All-in-one mode (suitable for small-medium deployments)
+    
+    auth_enabled: false
+    
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9096
+      log_level: info
+      log_format: json
+      
+      # Graceful shutdown
+      grpc_server_max_concurrent_streams: 0
+      http_server_read_timeout: 30s
+      http_server_write_timeout: 30s
+    
+    # Common configuration
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+    
+    # Distributor configuration
+    distributor:
+      ring:
+        kvstore:
+          store: inmemory
+    
+    # Ingester configuration
+    ingester:
+      lifecycler:
+        address: 127.0.0.1
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+        final_sleep: 0s
+      
+      # Chunk settings
+      chunk_idle_period: 1h
+      chunk_block_size: 262144
+      chunk_target_size: 1536000
+      chunk_retain_period: 30s
+      max_transfer_retries: 0
+      
+      # WAL configuration
+      wal:
+        enabled: true
+        dir: /loki/wal
+        checkpoint_duration: 5m
+        flush_on_shutdown: true
+        replay_memory_ceiling: 1GB
+    
+    # Schema configuration
+    schema_config:
+      configs:
+      - from: 2020-10-24
+        store: boltdb-shipper
+        object_store: filesystem
+        schema: v11
+        index:
+          prefix: index_
+          period: 24h
+    
+    # Storage configuration
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/index
+        cache_location: /loki/index_cache
+        cache_ttl: 24h
+        shared_store: filesystem
+      
+      filesystem:
+        directory: /loki/chunks
+      
+      # Index query cache
+      index_queries_cache_config:
+        memcached_client:
+          consistent_hash: true
+        enable_fifocache: true
+        fifocache:
+          max_size_items: 1024
+          ttl: 24h
+    
+    # Limits configuration (production tuned)
+    limits_config:
+      # Ingestion limits
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      ingestion_rate_mb: 10
+      ingestion_burst_size_mb: 20
+      
+      # Query limits
+      max_query_length: 721h
+      max_query_parallelism: 32
+      max_query_series: 500
+      max_streams_per_user: 10000
+      max_global_streams_per_user: 10000
+      
+      # Label limits
+      max_label_name_length: 1024
+      max_label_value_length: 2048
+      max_label_names_per_series: 30
+      
+      # Line limits
+      max_line_size: 256KB
+      max_entries_limit_per_query: 5000
+      
+      # Cardinality limits
+      cardinality_limit: 100000
+      max_streams_matchers_per_query: 1000
+      
+      # Split queries by interval
+      split_queries_by_interval: 15m
+      
+      # Per-stream rate limits
+      per_stream_rate_limit: 3MB
+      per_stream_rate_limit_burst: 15MB
+    
+    # Chunk store configuration
+    chunk_store_config:
+      max_look_back_period: 0s
+      chunk_cache_config:
+        enable_fifocache: true
+        fifocache:
+          max_size_items: 1024
+          ttl: 24h
+    
+    # Table manager (retention)
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 720h
+      poll_interval: 10m
+    
+    # Compactor (log compaction and retention)
+    compactor:
+      working_directory: /loki/compactor
+      shared_store: filesystem
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+    
+    # Query scheduler (optional, for better query distribution)
+    query_scheduler:
+      max_outstanding_requests_per_tenant: 256
+    
+    # Frontend (query frontend for better caching)
+    frontend:
+      log_queries_longer_than: 5s
+      max_outstanding_per_tenant: 256
+      compress_responses: true
+    
+    # Querier configuration
+    querier:
+      max_concurrent: 10
+      query_ingesters_within: 3h
+    
+    # Query range configuration
+    query_range:
+      align_queries_with_step: true
+      cache_results: true
+      max_retries: 5
+      results_cache:
+        cache:
+          enable_fifocache: true
+          fifocache:
+            max_size_items: 1024
+            ttl: 24h
+    
+    # Ruler (for alerting rules - optional)
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /loki/rules
+      rule_path: /loki/rules-temp
+      alertmanager_url: http://alertmanager:9093
+      ring:
+        kvstore:
+          store: inmemory
+      enable_api: true
+      enable_alertmanager_v2: true

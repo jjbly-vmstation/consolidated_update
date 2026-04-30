@@ -1,0 +1,20 @@
+---
+ansible_user: jjbly
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+ansible_become: true
+ansible_become_method: sudo
+
+disable_swap: true
+setup_firewall: false
+
+k8s_sysctl:
+  net.ipv4.ip_forward: 1
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 1
+  net.ipv4.conf.all.forwarding: 1
+  fs.inotify.max_user_watches: 524288
+  vm.max_map_count: 262144
+
+k8s_kernel_modules:
+  - br_netfilter
+  - overlay
