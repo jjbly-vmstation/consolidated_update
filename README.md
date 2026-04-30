@@ -72,6 +72,11 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
 
 ## Outstanding TODOs
 
+### CI/CD (next priority)
+6. **`ansible/playbooks/cicd.yml`** — install GitHub Actions self-hosted runner on masternode as a systemd service. Run this manually after `bootstrap.yml` and `masternode.yml` as a one-time prerequisite. See `docs/CICD.md` for the full plan, bootstrap sequence, and playbook skeleton.
+7. **`.github/workflows/ci.yml`** — yamllint + ansible-lint + `kubectl kustomize` validation on every PR, targeting the self-hosted runner (`runs-on: [self-hosted, masternode]`)
+
+### Applications
 1. **Nextcloud SSL** — obtain cert from AD CS, create TLS secret — see `docs/NEXTCLOUD_SSL.md`
 2. **Nextcloud AD SSO** — Kerberos/SAML via AD DC (after SSL)
 3. **Grafana admin password** — replace hardcoded `"admin"` with a Secret
