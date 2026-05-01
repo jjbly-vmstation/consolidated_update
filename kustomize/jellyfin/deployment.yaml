@@ -30,6 +30,15 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      initContainers:
+        - name: fix-config-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chown -R 1000:1000 /config"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: jellyfin-config
+              mountPath: /config
       containers:
         - name: jellyfin
           image: jellyfin/jellyfin:10.10
@@ -49,7 +58,7 @@ spec:
             - name: JELLYFIN_LOG_LEVEL
               value: "Information"
             - name: JELLYFIN_PublishedServerUrl
-              value: "http://192.168.4.61:8096"
+              value: "http://192.168.4.61:30096"
           volumeMounts:
             - name: jellyfin-config
               mountPath: /config

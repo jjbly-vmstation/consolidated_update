@@ -12,3 +12,5 @@ resources:
 images:
   - name: jellyfin/jellyfin
     newTag: "10.10"
+  - name: busybox
+    newTag: "latest"
