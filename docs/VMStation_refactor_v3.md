@@ -214,6 +214,45 @@
       permitted_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96
     ```
 
+    #### Troubleshooting: `adcli: Couldn't set password — Message stream modified`
+
+    **Symptom:** Running `adcli join` (directly, not via realm) fails at the "set password" step:
+    ```
+    ! Couldn't set password for computer account: MASTERNODE$: Message stream modified
+    ```
+
+    **Causes:**
+    1. A stale computer account already exists in the OU — adcli found it and tried to reset its password instead of creating a new one.
+    2. Windows Server 2025 enforces LDAP channel binding / signing by default. `adcli join` called directly fails to negotiate a signed LDAP session before attempting the password operation.
+
+    **Fix:**
+
+    **Step 1 — Delete the stale computer account on the DC:**
+    ```powershell
+    # Run on WSDC-Homelab as Administrator
+    Get-ADComputer -Identity "MASTERNODE" | Remove-ADObject -Recursive -Confirm:$false
+    ```
+    Or in ADUC: navigate to the `K8s_Nodes` OU → right-click the computer object → Delete.
+
+    **Step 2 — Use `realm join`, not `adcli join` directly:**
+    `realm` coordinates sssd, adcli, and the Kerberos stack so LDAP operations go through a GSSAPI-authenticated channel that satisfies the DC's signing requirement.
+    ```bash
+    sudo realm leave
+    sudo realm join --user=svc_k8s_join \
+      --computer-ou="OU=K8s_Nodes,DC=vmstation,DC=local" \
+      --membership-software=adcli \
+      vmstation.local
+    ```
+
+    **Step 3 (if still failing) — Relax LDAP signing on the DC:**
+    Open **Group Policy Management** → **Default Domain Controllers Policy**:
+    ```
+    Computer Configuration → Policies → Windows Settings → Security Settings
+      → Local Policies → Security Options
+        → "Domain controller: LDAP server signing requirements" → None
+    ```
+    Then force a refresh: `gpupdate /force`
+
 ### Why this is the "Pro" way:
 *   **Security:** If the `s_k8s_join` account is ever compromised, the attacker can only mess with the computers in that specific `K8s_Nodes` folder, not your entire domain.
 *   **Automation:** As you add more worker nodes to your Kubernetes cluster, you can use this same service account in a script without worrying about Domain Admin credentials being exposed.
