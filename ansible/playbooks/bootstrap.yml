@@ -60,14 +60,11 @@
       tags: [packages]
 
     - name: Configure chrony to use AD DC as NTP source
-      ansible.builtin.template:
-        dest: "{{ chrony_config_path | default('/etc/chrony.conf') }}"
-        hosts: linux_nodes
-        owner: jjbly
-        group: jjbly
-        become: true
+      ansible.builtin.copy:
+        dest: "{{ chrony_config_path }}"
+        owner: root
+        group: root
         mode: '0644'
-        # Use a separate .j2 file or use the 'content' key with a lookup
         content: |
           # Managed by Ansible - do not edit directly
           {% for server in ntp_servers %}
@@ -77,7 +74,7 @@
           makestep 1.0 3
           rtcsync
           logdir /var/log/chrony
-      register: chrony_config_result
+      notify: restart chrony
       tags: [ntp]
 
     - name: Enable and start chrony
