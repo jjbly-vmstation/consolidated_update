@@ -59,19 +59,33 @@
         msg: "{{ join_command.stdout }}"
       tags: [join]
 
+    - name: Check if worker is already joined
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      register: worker_joined
+      tags: [join]
+
     - name: Reset any existing kubeadm state on workers
       ansible.builtin.command:
         cmd: kubeadm reset -f
-      delegate_to: "{{ item }}"
-      loop: "{{ groups['workers'] }}"
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
       changed_when: true
       tags: [join]
 
     - name: Join workers to cluster
       ansible.builtin.command:
         cmd: "{{ join_command.stdout }}"
-      delegate_to: "{{ item }}"
-      loop: "{{ groups['workers'] }}"
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
       changed_when: true
       tags: [join]
 
@@ -80,16 +94,22 @@
         path: /etc/kubernetes/kubelet.conf
         regexp: 'server: https://localhost:6443'
         replace: 'server: https://{{ control_plane_endpoint }}'
-      delegate_to: "{{ item }}"
-      loop: "{{ groups['workers'] }}"
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
       tags: [join]
 
     - name: Restart kubelet on workers
       ansible.builtin.systemd:
         name: kubelet
         state: restarted
-      delegate_to: "{{ item }}"
-      loop: "{{ groups['workers'] }}"
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
       tags: [join]
 
     - name: Label workers with node-role.kubernetes.io/worker=worker
