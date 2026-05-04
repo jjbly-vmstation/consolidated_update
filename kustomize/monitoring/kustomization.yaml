@@ -25,6 +25,7 @@ resources:
   - exporters/node-exporter.yaml
   - exporters/kube-state-metrics.yaml
   - exporters/blackbox-exporter.yaml
+  - ingress.yaml
 
 images:
   - name: prom/prometheus

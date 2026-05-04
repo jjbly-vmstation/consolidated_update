@@ -2,25 +2,25 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: jellyfin-ingress
-  namespace: jellyfin
+  name: nextcloud-ingress
+  namespace: nextcloud
   labels:
-    app: jellyfin
-    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/name: nextcloud
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
 spec:
   ingressClassName: nginx
   rules:
-    - host: jellyfin.vmstation.local
+    - host: nextcloud.vmstation.local
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: jellyfin-service
+                name: nextcloud
                 port:
-                  number: 8096
+                  number: 80

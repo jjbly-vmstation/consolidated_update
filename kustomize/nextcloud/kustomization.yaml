@@ -8,3 +8,4 @@ resources:
   - mariadb.yaml
   - nextcloud.yaml
   - service.yaml
+  - ingress.yaml

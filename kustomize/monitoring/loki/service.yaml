@@ -1,5 +1,5 @@
 ---
-# Loki Service - ClusterIP for internal access
+# Headless service for gRPC intra-cluster communication
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,7 +14,7 @@ metadata:
     prometheus.io/port: "3100"
 spec:
   type: ClusterIP
-  clusterIP: None  # Headless service for StatefulSet
+  clusterIP: None
   ports:
   - port: 3100
     targetPort: http-metrics
@@ -28,27 +28,6 @@ spec:
     app.kubernetes.io/name: loki
     app.kubernetes.io/component: logging
 ---
-# Loki Service - NodePort for external access
-apiVersion: v1
-kind: Service
-metadata:
-  name: loki-external
-  namespace: monitoring
-  labels:
-    app: loki
-spec:
-  type: NodePort
-  ports:
-  - port: 3100
-    targetPort: http-metrics
-    nodePort: 31100
-    name: http
-    protocol: TCP
-  selector:
-    app.kubernetes.io/name: loki
-    app.kubernetes.io/component: logging
----
-# NetworkPolicy for Loki - Enterprise Security
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -65,7 +44,6 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # Allow Grafana to query Loki
   - from:
     - podSelector:
         matchLabels:
@@ -73,7 +51,6 @@ spec:
     ports:
     - protocol: TCP
       port: 3100
-  # Allow Promtail to send logs
   - from:
     - podSelector:
         matchLabels:
@@ -83,18 +60,6 @@ spec:
       port: 3100
     - protocol: TCP
       port: 9096
-  # Allow Syslog server to forward logs
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: infrastructure
-    - podSelector:
-        matchLabels:
-          app: syslog-server
-    ports:
-    - protocol: TCP
-      port: 3100
-  # Allow Prometheus to scrape metrics
   - from:
     - podSelector:
         matchLabels:
@@ -102,13 +67,7 @@ spec:
     ports:
     - protocol: TCP
       port: 3100
-  # Allow external access via NodePort
-  - from: []
-    ports:
-    - protocol: TCP
-      port: 3100
   egress:
-  # Allow DNS resolution
   - to:
     - namespaceSelector:
         matchLabels:

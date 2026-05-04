@@ -9,11 +9,10 @@ metadata:
     app.kubernetes.io/name: jellyfin
     app.kubernetes.io/component: media-server
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
     - port: 8096
       targetPort: 8096
-      nodePort: 30096
       name: http
       protocol: TCP
   selector:

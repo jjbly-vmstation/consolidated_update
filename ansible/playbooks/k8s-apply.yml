@@ -5,6 +5,7 @@
 #
 # Usage:
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags ingress
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags jellyfin
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
 
@@ -18,6 +19,12 @@
     repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
+    - name: Apply nginx ingress controller
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/ingress
+      changed_when: true
+      tags: [ingress]
+
     - name: Apply monitoring stack
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/monitoring
