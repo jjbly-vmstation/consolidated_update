@@ -54,6 +54,15 @@
           _continue_ = "dns=lan&"
         dest: '{{ temp_dir }}\wildcard.inf'
 
+    - name: Remove stale cert files from previous runs
+      ansible.windows.win_file:
+        path: "{{ temp_dir }}\\{{ item }}"
+        state: absent
+      loop:
+        - wildcard.csr
+        - wildcard.cer
+        - wildcard.pfx
+
     - name: Generate CSR
       ansible.windows.win_shell: |
         certreq -new -q "{{ temp_dir }}\wildcard.inf" "{{ temp_dir }}\wildcard.csr"
