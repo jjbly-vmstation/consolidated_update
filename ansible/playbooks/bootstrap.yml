@@ -23,6 +23,11 @@
         name: chrony
         state: restarted
 
+    - name: restart containerd
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+
     - name: apply sysctl
       ansible.builtin.command: sysctl --system
       changed_when: true
@@ -163,11 +168,7 @@
         path: "{{ containerd_config_path }}"
         regexp: 'SystemdCgroup = false'
         replace: 'SystemdCgroup = true'
-      notify:
-        - name: restart containerd
-          ansible.builtin.service:
-            name: containerd
-            state: restarted
+      notify: restart containerd
       tags: [containerd]
 
     - name: Enable and start containerd
