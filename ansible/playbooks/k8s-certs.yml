@@ -14,6 +14,7 @@
 
   vars:
     ad_ca_name: "wsdc-homelab-CA"
+    cert_template: "WebServer"
     pfx_password: "{{ vault_pfx_export_password | default('TempCertExport!') }}"
     temp_dir: 'C:\Temp\k8s-certs'
 
@@ -52,6 +53,9 @@
           2.5.29.17 = "{text}"
           _continue_ = "dns=*.lan&"
           _continue_ = "dns=lan&"
+
+          [RequestAttributes]
+          CertificateTemplate = {{ cert_template }}
         dest: '{{ temp_dir }}\wildcard.inf'
 
     - name: Remove stale cert files from previous runs
