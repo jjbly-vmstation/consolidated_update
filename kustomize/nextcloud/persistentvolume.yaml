@@ -24,7 +24,7 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
 ---
 # MariaDB PV — pinned to storagenodet3500 (homelab is now Windows)
 apiVersion: v1
@@ -51,4 +51,4 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local

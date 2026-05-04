@@ -25,4 +25,4 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
