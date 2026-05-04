@@ -42,6 +42,14 @@
         group: jjbly
         mode: '0600'
 
+    - name: Ensure KUBECONFIG is set correctly in .bashrc
+      ansible.builtin.lineinfile:
+        path: /home/jjbly/.bashrc
+        line: 'export KUBECONFIG=/home/jjbly/.kube/config'
+        regexp: '^export KUBECONFIG='
+        owner: jjbly
+        group: jjbly
+
     - name: Apply Calico CNI
       ansible.builtin.command:
         cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f https://docs.projectcalico.org/manifests/calico.yaml
