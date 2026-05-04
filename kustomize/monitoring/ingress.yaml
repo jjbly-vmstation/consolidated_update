@@ -7,8 +7,14 @@ metadata:
   labels:
     app: grafana
     app.kubernetes.io/name: grafana
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - grafana.vmstation.local
+      secretName: vmstation-wildcard-tls
   rules:
     - host: grafana.vmstation.local
       http:
@@ -29,8 +35,14 @@ metadata:
   labels:
     app: prometheus
     app.kubernetes.io/name: prometheus
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - prometheus.vmstation.local
+      secretName: vmstation-wildcard-tls
   rules:
     - host: prometheus.vmstation.local
       http:

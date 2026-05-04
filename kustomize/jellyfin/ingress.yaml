@@ -8,11 +8,16 @@ metadata:
     app: jellyfin
     app.kubernetes.io/name: jellyfin
   annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - jellyfin.vmstation.local
+      secretName: vmstation-wildcard-tls
   rules:
     - host: jellyfin.vmstation.local
       http:

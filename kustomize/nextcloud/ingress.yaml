@@ -7,12 +7,17 @@ metadata:
   labels:
     app.kubernetes.io/name: nextcloud
   annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - nextcloud.vmstation.local
+      secretName: vmstation-wildcard-tls
   rules:
     - host: nextcloud.vmstation.local
       http:

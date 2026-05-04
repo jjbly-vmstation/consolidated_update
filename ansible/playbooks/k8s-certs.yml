@@ -1,0 +1,155 @@
+---
+# k8s-certs.yml — Request wildcard *.vmstation.local cert from AD CA
+# and install it as TLS secrets in each app namespace.
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml
+#
+# Re-run annually when the cert approaches expiry.
+
+- name: Generate wildcard cert from AD CA
+  hosts: homelab
+  gather_facts: false
+
+  vars:
+    ad_ca_name: "wsdc-homelab-CA"
+    pfx_password: "{{ vault_pfx_export_password | default('TempCertExport!') }}"
+    temp_dir: 'C:\Temp\k8s-certs'
+
+  tasks:
+    - name: Create temp directory on DC
+      ansible.windows.win_file:
+        path: "{{ temp_dir }}"
+        state: directory
+
+    - name: Write certreq INF for wildcard cert
+      ansible.windows.win_copy:
+        content: |
+          [Version]
+          Signature="$Windows NT$"
+
+          [NewRequest]
+          Subject = "CN=*.vmstation.local"
+          KeySpec = 1
+          KeyLength = 2048
+          Exportable = TRUE
+          MachineKeySet = FALSE
+          SMIME = False
+          PrivateKeyArchive = FALSE
+          UserProtected = FALSE
+          UseExistingKeySet = FALSE
+          ProviderName = "Microsoft RSA SChannel Cryptographic Provider"
+          ProviderType = 12
+          RequestType = PKCS10
+          KeyUsage = 0xa0
+          HashAlgorithm = SHA256
+
+          [EnhancedKeyUsageExtension]
+          OID = 1.3.6.1.5.5.7.3.1
+
+          [Extensions]
+          2.5.29.17 = "{text}"
+          _continue_ = "dns=*.vmstation.local&"
+          _continue_ = "dns=vmstation.local&"
+        dest: '{{ temp_dir }}\wildcard.inf'
+
+    - name: Generate CSR
+      ansible.windows.win_shell: |
+        certreq -new -q "{{ temp_dir }}\wildcard.inf" "{{ temp_dir }}\wildcard.csr"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Submit CSR to AD CA
+      ansible.windows.win_shell: |
+        certreq -submit -q -config "wsdc-homelab\{{ ad_ca_name }}" `
+          "{{ temp_dir }}\wildcard.csr" "{{ temp_dir }}\wildcard.cer"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Accept cert into user store
+      ansible.windows.win_shell: |
+        certreq -accept -q "{{ temp_dir }}\wildcard.cer"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Export cert + chain as PFX
+      ansible.windows.win_shell: |
+        $thumb = (Get-ChildItem Cert:\CurrentUser\My |
+          Where-Object { $_.Subject -match [regex]::Escape('*.vmstation.local') } |
+          Sort-Object NotAfter -Descending |
+          Select-Object -First 1).Thumbprint
+        if (-not $thumb) { Write-Error "Cert not found in store"; exit 1 }
+        $pwd = ConvertTo-SecureString -String "{{ pfx_password }}" -Force -AsPlainText
+        Export-PfxCertificate -Cert "Cert:\CurrentUser\My\$thumb" `
+          -FilePath "{{ temp_dir }}\wildcard.pfx" `
+          -Password $pwd -ChainOption BuildChain -Force
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Fetch PFX to controller
+      ansible.builtin.fetch:
+        src: '{{ temp_dir }}\wildcard.pfx'
+        dest: /tmp/vmstation-wildcard.pfx
+        flat: true
+
+    - name: Remove temp files from DC
+      ansible.windows.win_file:
+        path: "{{ temp_dir }}"
+        state: absent
+
+- name: Install wildcard TLS secret in Kubernetes
+  hosts: control_plane
+  become: false
+  gather_facts: false
+
+  vars:
+    kubeconfig: /home/jjbly/.kube/config
+    pfx_password: "{{ vault_pfx_export_password | default('TempCertExport!') }}"
+    pfx_path: /tmp/vmstation-wildcard.pfx
+    cert_namespaces:
+      - jellyfin
+      - monitoring
+      - nextcloud
+
+  tasks:
+    - name: Extract TLS cert from PFX
+      # -legacy handles Windows PKCS12 with RC2/3DES (required on OpenSSL 3.x)
+      ansible.builtin.shell: |
+        openssl pkcs12 -in {{ pfx_path }} \
+          -nokeys -clcerts \
+          -out /tmp/vmstation-tls.crt \
+          -passin pass:"{{ pfx_password }}" -legacy 2>/dev/null || \
+        openssl pkcs12 -in {{ pfx_path }} \
+          -nokeys -clcerts \
+          -out /tmp/vmstation-tls.crt \
+          -passin pass:"{{ pfx_password }}"
+      changed_when: true
+
+    - name: Extract TLS key from PFX
+      ansible.builtin.shell: |
+        openssl pkcs12 -in {{ pfx_path }} \
+          -nocerts -nodes \
+          -out /tmp/vmstation-tls.key \
+          -passin pass:"{{ pfx_password }}" -legacy 2>/dev/null || \
+        openssl pkcs12 -in {{ pfx_path }} \
+          -nocerts -nodes \
+          -out /tmp/vmstation-tls.key \
+          -passin pass:"{{ pfx_password }}"
+      changed_when: true
+
+    - name: Install TLS secret in each namespace
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} \
+          create secret tls vmstation-wildcard-tls \
+          --cert=/tmp/vmstation-tls.crt \
+          --key=/tmp/vmstation-tls.key \
+          -n {{ item }} \
+          --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      loop: "{{ cert_namespaces }}"
+      changed_when: true
+
+    - name: Remove local cert files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ pfx_path }}"
+        - /tmp/vmstation-tls.crt
+        - /tmp/vmstation-tls.key
