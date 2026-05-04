@@ -25,6 +25,14 @@
           --service-cidr {{ service_cidr }}      
       changed_when: true
     
+    - name: Create .kube directory for jjbly
+      ansible.builtin.file:
+        path: /home/jjbly/.kube
+        state: directory
+        owner: jjbly
+        group: jjbly
+        mode: '0700'
+
     - name: Set up kubeconfig for jjbly
       ansible.builtin.copy:
         src: /etc/kubernetes/admin.conf
