@@ -13,10 +13,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - grafana.vmstation.local
+        - grafana.lan
       secretName: vmstation-wildcard-tls
   rules:
-    - host: grafana.vmstation.local
+    - host: grafana.lan
       http:
         paths:
           - path: /
@@ -41,10 +41,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - prometheus.vmstation.local
+        - prometheus.lan
       secretName: vmstation-wildcard-tls
   rules:
-    - host: prometheus.vmstation.local
+    - host: prometheus.lan
       http:
         paths:
           - path: /

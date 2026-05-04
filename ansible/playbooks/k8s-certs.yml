@@ -29,7 +29,7 @@
           Signature="$Windows NT$"
 
           [NewRequest]
-          Subject = "CN=*.vmstation.local"
+          Subject = "CN=*.lan"
           KeySpec = 1
           KeyLength = 2048
           Exportable = TRUE
@@ -49,8 +49,8 @@
 
           [Extensions]
           2.5.29.17 = "{text}"
-          _continue_ = "dns=*.vmstation.local&"
-          _continue_ = "dns=vmstation.local&"
+          _continue_ = "dns=*.lan&"
+          _continue_ = "dns=lan&"
         dest: '{{ temp_dir }}\wildcard.inf'
 
     - name: Generate CSR
@@ -72,7 +72,7 @@
     - name: Export cert + chain as PFX
       ansible.windows.win_shell: |
         $thumb = (Get-ChildItem Cert:\CurrentUser\My |
-          Where-Object { $_.Subject -match [regex]::Escape('*.vmstation.local') } |
+          Where-Object { $_.Subject -match [regex]::Escape('*.lan') } |
           Sort-Object NotAfter -Descending |
           Select-Object -First 1).Thumbprint
         if (-not $thumb) { Write-Error "Cert not found in store"; exit 1 }

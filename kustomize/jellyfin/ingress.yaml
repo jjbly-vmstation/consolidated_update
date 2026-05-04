@@ -16,10 +16,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - jellyfin.vmstation.local
+        - jellyfin.lan
       secretName: vmstation-wildcard-tls
   rules:
-    - host: jellyfin.vmstation.local
+    - host: jellyfin.lan
       http:
         paths:
           - path: /

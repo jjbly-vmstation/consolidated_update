@@ -16,10 +16,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - nextcloud.vmstation.local
+        - nextcloud.lan
       secretName: vmstation-wildcard-tls
   rules:
-    - host: nextcloud.vmstation.local
+    - host: nextcloud.lan
       http:
         paths:
           - path: /
