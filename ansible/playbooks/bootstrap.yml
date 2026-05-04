@@ -62,6 +62,7 @@
     - name: Configure chrony to use AD DC as NTP source
       ansible.builtin.template:
         dest: "{{ chrony_config_path | default('/etc/chrony.conf') }}"
+        hosts: linux_nodes
         owner: jjbly
         group: jjbly
         become: true
