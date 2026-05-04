@@ -71,8 +71,8 @@
     - name: Discover CA config string from Active Directory
       ansible.windows.win_shell: |
         $searchBase = "CN=Enrollment Services,CN=Public Key Services,CN=Services,CN=Configuration,DC=vmstation,DC=local"
-        $ca = Get-ADObject -SearchBase $searchBase -Filter * -Properties dNSHostName, cn | Select-Object -First 1
-        if (-not $ca) { Write-Error "No CA found in AD"; exit 1 }
+        $ca = Get-ADObject -SearchBase $searchBase -Filter { objectClass -eq "pKIEnrollmentService" } -Properties dNSHostName, cn | Select-Object -First 1
+        if (-not $ca) { Write-Error "No CA found in AD — is AD CS installed and certsvc running?"; exit 1 }
         Write-Output "$($ca.dNSHostName)\$($ca.cn)"
       register: ca_config
       changed_when: false
