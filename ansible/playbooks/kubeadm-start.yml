@@ -1,0 +1,44 @@
+---
+# kubeadm-start.yml — get kubeadm join command
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/kubeadm-start.yml
+
+- name: Get kubeadm join command
+  hosts: control_plane
+  become: false
+  gather_facts: false
+
+  vars:
+    kubeconfig: /etc/kubernetes/admin.conf
+    repo_root: "{{ playbook_dir }}/../.."
+
+  tasks:
+    - name: Rev it up
+      ansible.builtin.command:
+        cmd: kubeadm init
+      changed_when: false
+
+    - name: Get kubeadm join command
+      ansible.builtin.command:
+        cmd: kubeadm token create --print-join-command
+      changed_when: false
+      register: join_command
+      tags: [join]
+
+    - name: Display kubeadm join command
+      ansible.builtin.debug:
+        msg: "{{ join_command.stdout }}"
+      tags: [join]
+
+    - name: Show nodes status
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} get nodes
+      changed_when: false
+      register: node_status
+      tags: [status]
+
+    - name: Display nodes status
+      ansible.builtin.debug:
+        msg: "{{ node_status.stdout_lines }}"
+      tags: [status]
