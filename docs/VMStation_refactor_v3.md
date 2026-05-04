@@ -216,56 +216,136 @@
 
     #### Troubleshooting: `adcli: Couldn't set password — Message stream modified`
 
-    **Symptom:** Running `adcli join` (directly, not via realm) fails at the "set password" step:
-    ```
-    ! Couldn't set password for computer account: MASTERNODE$: Message stream modified
-    ```
+    **Root cause:** Windows Server 2025 enforces LDAP channel binding and signing
+    by default. The `unicodePwd` LDAP modify that sets the computer account
+    password requires a TLS-secured channel. Without it, the DC rejects the
+    write with "Message stream modified" (LDAP integrity check failed).
+    The journal also shows encryption type warnings (RC4/DES offered but blocked
+    by krb5.conf) confirming no acceptable signed channel could be negotiated.
 
-    **Causes:**
-    1. A stale computer account already exists in the OU — adcli found it and tried to reset its password instead of creating a new one.
-    2. Windows Server 2025 enforces LDAP channel binding / signing by default. `adcli join` called directly fails to negotiate a signed LDAP session before attempting the password operation.
+    **The correct fix is LDAPS via AD Certificate Services — not relaxing DC security.**
 
-    **Fix:**
+    ---
 
-    **Step 1 — Delete the stale computer account on the DC:**
+    #### Step 4a — Install AD CS on WSDC-Homelab (enables LDAPS automatically)
+
+    Open PowerShell as Administrator on **WSDC-Homelab**:
+
     ```powershell
-    # Run on WSDC-Homelab as Administrator
+    # Install the CA role
+    Install-WindowsFeature -Name AD-Certificate, ADCS-Cert-Authority `
+      -IncludeManagementTools
+
+    # Configure as Enterprise Root CA
+    # CACommonName appears in all issued certs — choose something meaningful
+    Install-AdcsCertificationAuthority `
+      -CAType EnterpriseRootCA `
+      -CACommonName "VMStation-Lab-CA" `
+      -KeyLength 4096 `
+      -HashAlgorithmName SHA256 `
+      -ValidityPeriod Years `
+      -ValidityPeriodUnits 10 `
+      -Force
+    ```
+
+    Once AD CS is installed, the DC **auto-enrolls** for a Domain Controller
+    certificate. LDAPS (port 636) becomes active within ~15 minutes, or
+    immediately after running:
+
+    ```powershell
+    # Force the DC to request its certificate now
+    certutil -pulse
+    # Restart NTDS to bind the new cert
+    Restart-Service NTDS -Force
+    ```
+
+    Verify LDAPS is listening:
+    ```powershell
+    netstat -an | findstr :636
+    # Should show:  TCP  0.0.0.0:636  LISTENING
+    ```
+
+    ---
+
+    #### Step 4b — Export the CA certificate
+
+    ```powershell
+    # Export the root CA cert to a PEM file for Linux consumption
+    $ca = Get-ChildItem Cert:\LocalMachine\Root |
+            Where-Object { $_.Subject -like "*VMStation-Lab-CA*" }
+    Export-Certificate -Cert $ca -FilePath C:\vmstation-lab-ca.cer -Type CERT
+    certutil -encode C:\vmstation-lab-ca.cer C:\vmstation-lab-ca.pem
+    ```
+
+    Transfer `C:\vmstation-lab-ca.pem` to each Linux node (SCP, SMB share, etc.):
+
+    ```bash
+    # Example: copy via SCP from a Windows share or directly
+    scp jjbly@192.168.4.62:"C:/vmstation-lab-ca.pem" /tmp/vmstation-lab-ca.pem
+    ```
+
+    ---
+
+    #### Step 4c — Trust the CA on each Linux node
+
+    ```bash
+    sudo cp /tmp/vmstation-lab-ca.pem /usr/local/share/ca-certificates/vmstation-lab-ca.crt
+    sudo update-ca-certificates
+    # Should output: 1 added
+    ```
+
+    Configure the system LDAP client to enforce TLS verification:
+    ```bash
+    # /etc/ldap/ldap.conf
+    sudo tee -a /etc/ldap/ldap.conf <<'EOF'
+    TLS_CACERT /etc/ssl/certs/ca-certificates.crt
+    TLS_REQCERT demand
+    EOF
+    ```
+
+    Test LDAPS connectivity before attempting the join:
+    ```bash
+    ldapsearch -H ldaps://wsdc-homelab.vmstation.local \
+      -x -b "DC=vmstation,DC=local" \
+      -D "svc_k8s_join@vmstation.local" -W \
+      -s base "(objectClass=*)"
+    # Should return domain naming context attributes — no TLS errors
+    ```
+
+    ---
+
+    #### Step 4d — Delete any stale computer account, then join over LDAPS
+
+    If MASTERNODE already exists in the OU from a failed prior attempt, remove it:
+    ```powershell
+    # On WSDC-Homelab
     Get-ADComputer -Identity "MASTERNODE" | Remove-ADObject -Recursive -Confirm:$false
     ```
-    Or in ADUC: navigate to the `K8s_Nodes` OU → right-click the computer object → Delete.
 
-    **Step 2 — Use `realm join`, not `adcli join` directly:**
-    `realm` coordinates sssd, adcli, and the Kerberos stack so LDAP operations go through a GSSAPI-authenticated channel that satisfies the DC's signing requirement.
+    Then join from the Linux node using LDAPS:
     ```bash
-    sudo realm leave
+    sudo realm leave 2>/dev/null; true
     sudo realm join --user=svc_k8s_join \
       --computer-ou="OU=K8s_Nodes,DC=vmstation,DC=local" \
       --membership-software=adcli \
       vmstation.local
     ```
 
-    **Step 3 (if still failing) — Relax LDAP channel binding on the DC:**
+    `realm` passes `--use-ldaps` to adcli automatically when it detects that
+    port 636 is available and the CA is trusted. The `unicodePwd` write now
+    travels over an authenticated TLS channel, satisfying WS2025's channel
+    binding requirement.
 
-    Windows Server 2025 enforces LDAP channel binding and signing by default.
-    The password-set step (`unicodePwd` LDAP modify) fails because the session
-    key offered for signing is RC4/DES — which the Linux krb5.conf correctly
-    blocks — and no AES-keyed channel is negotiated for that step.
-
-    Run on **WSDC-Homelab** PowerShell (Administrator):
-    ```powershell
-    # 0 = never require channel binding (2 = always, default on WS2025)
-    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" `
-      -Name "LdapEnforceChannelBinding" -Value 0 -Type DWord
-
-    # 1 = negotiate signing (2 = require, which blocks unsigned password-set)
-    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" `
-      -Name "LDAPServerIntegrity" -Value 1 -Type DWord
-
-    Restart-Service NTDS -Force
+    Verify the join succeeded and the object landed in the correct OU:
+    ```bash
+    realm list
+    # Should show vmstation.local with configured: kerberos-member
     ```
-
-    Then retry `realm join` on the Linux node. The account creation will
-    succeed and the password set will complete.
+    ```powershell
+    # On DC — confirm object location
+    Get-ADComputer -Identity "MASTERNODE" | Select-Object DistinguishedName
+    # CN=MASTERNODE,OU=K8s_Nodes,DC=vmstation,DC=local
+    ```
 
 ### Why this is the "Pro" way:
 *   **Security:** If the `s_k8s_join` account is ever compromised, the attacker can only mess with the computers in that specific `K8s_Nodes` folder, not your entire domain.
