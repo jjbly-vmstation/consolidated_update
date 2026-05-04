@@ -59,13 +59,37 @@
         msg: "{{ join_command.stdout }}"
       tags: [join]
 
-    - name: Join workers to cluster
+    - name: Reset any existing kubeadm state on workers
       ansible.builtin.command:
-        cmd: "{{ join_command.stdout }}"
-        creates: /etc/kubernetes/kubelet.conf
+        cmd: kubeadm reset -f
       delegate_to: "{{ item }}"
       loop: "{{ groups['workers'] }}"
       changed_when: true
+      tags: [join]
+
+    - name: Join workers to cluster
+      ansible.builtin.command:
+        cmd: "{{ join_command.stdout }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      changed_when: true
+      tags: [join]
+
+    - name: Fix kubelet.conf server address on workers
+      ansible.builtin.replace:
+        path: /etc/kubernetes/kubelet.conf
+        regexp: 'server: https://localhost:6443'
+        replace: 'server: https://{{ control_plane_endpoint }}'
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      tags: [join]
+
+    - name: Restart kubelet on workers
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
       tags: [join]
 
     - name: Show nodes status
