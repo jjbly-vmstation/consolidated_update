@@ -59,6 +59,15 @@
         msg: "{{ join_command.stdout }}"
       tags: [join]
 
+    - name: Join workers to cluster
+      ansible.builtin.command:
+        cmd: "{{ join_command.stdout }}"
+        creates: /etc/kubernetes/kubelet.conf
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      changed_when: true
+      tags: [join]
+
     - name: Show nodes status
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} get nodes
@@ -70,15 +79,3 @@
       ansible.builtin.debug:
         msg: "{{ node_status.stdout_lines }}"
       tags: [status]
-
-- name: Join worker nodes to cluster
-  hosts: workers
-  become: true
-  gather_facts: false
-
-  tasks:
-    - name: Join worker to cluster
-      ansible.builtin.command:
-        cmd: "{{ hostvars[groups['control_plane'][0]]['join_command']['stdout'] }}"
-        creates: /etc/kubernetes/kubelet.conf
-      changed_when: true
