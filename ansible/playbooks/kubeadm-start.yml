@@ -70,3 +70,15 @@
       ansible.builtin.debug:
         msg: "{{ node_status.stdout_lines }}"
       tags: [status]
+
+- name: Join worker nodes to cluster
+  hosts: workers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Join worker to cluster
+      ansible.builtin.command:
+        cmd: "{{ hostvars[groups['control_plane'][0]]['join_command']['stdout'] }}"
+        creates: /etc/kubernetes/kubelet.conf
+      changed_when: true
