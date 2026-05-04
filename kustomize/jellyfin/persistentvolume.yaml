@@ -17,7 +17,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/media/k8s/jellyfin
+    path: /srv/media/jellyfin-config
   nodeAffinity:
     required:
       nodeSelectorTerms:
