@@ -18,11 +18,11 @@
       args:
         creates: /etc/kubernetes/admin.conf
       ansible.builtin.command:
-      cmd: >-
-        kubeadm init
-        --control-plane-endpoint {{ control_plane_endpoint }}
-        --pod-network-cidr {{ pod_network_cidr }}
-        --service-cidr {{ service_cidr }}      
+        cmd: >-
+          kubeadm init
+          --control-plane-endpoint {{ control_plane_endpoint }}
+          --pod-network-cidr {{ pod_network_cidr }}
+          --service-cidr {{ service_cidr }}      
       changed_when: true
     
     - name: Set up kubeconfig for jjbly
