@@ -50,6 +50,12 @@
         owner: jjbly
         group: jjbly
 
+    - name: Ensure KUBECONFIG is set correctly in /etc/environment
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        line: 'KUBECONFIG=/home/jjbly/.kube/config'
+        regexp: '^KUBECONFIG='
+
     - name: Apply Calico CNI
       ansible.builtin.command:
         cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f https://docs.projectcalico.org/manifests/calico.yaml
