@@ -1,0 +1,123 @@
+---
+# Loki Service - ClusterIP for internal access
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app: loki
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3100"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+  - port: 3100
+    targetPort: http-metrics
+    name: http
+    protocol: TCP
+  - port: 9096
+    targetPort: grpc
+    name: grpc
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+---
+# Loki Service - NodePort for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-external
+  namespace: monitoring
+  labels:
+    app: loki
+spec:
+  type: NodePort
+  ports:
+  - port: 3100
+    targetPort: http-metrics
+    nodePort: 31100
+    name: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: logging
+---
+# NetworkPolicy for Loki - Enterprise Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: loki-netpol
+  namespace: monitoring
+  labels:
+    app: loki
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/component: logging
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow Grafana to query Loki
+  - from:
+    - podSelector:
+        matchLabels:
+          app: grafana
+    ports:
+    - protocol: TCP
+      port: 3100
+  # Allow Promtail to send logs
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: promtail
+    ports:
+    - protocol: TCP
+      port: 3100
+    - protocol: TCP
+      port: 9096
+  # Allow Syslog server to forward logs
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: infrastructure
+    - podSelector:
+        matchLabels:
+          app: syslog-server
+    ports:
+    - protocol: TCP
+      port: 3100
+  # Allow Prometheus to scrape metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 3100
+  # Allow external access via NodePort
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 3100
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

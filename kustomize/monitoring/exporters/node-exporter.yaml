@@ -1,0 +1,123 @@
+---
+# Node Exporter DaemonSet for System Metrics
+# Deploys on all nodes to collect hardware and OS metrics
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    app.kubernetes.io/name: node-exporter
+    app.kubernetes.io/component: exporter
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    app.kubernetes.io/name: node-exporter
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
+    vmstation.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+        app.kubernetes.io/name: node-exporter
+    spec:
+      serviceAccountName: node-exporter
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      tolerations:
+      # Deploy on control plane nodes
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      # Deploy on master nodes (older k8s versions)
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: node-exporter
+        image: prom/node-exporter:v1.6.1
+        args:
+        - --path.sysfs=/host/sys
+        - --path.rootfs=/host/root
+        - --path.procfs=/host/proc
+        - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+        - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
+        - --collector.netclass.ignored-devices=^(veth.*|docker.*|flannel.*|cali.*|tunl.*|vxlan.*|lo)$
+        - --collector.netdev.device-exclude=^(veth.*|docker.*|flannel.*|cali.*|tunl.*|vxlan.*|lo)$
+        # Enable additional collectors for enterprise monitoring
+        - --collector.systemd
+        - --collector.processes
+        - --collector.tcpstat
+        - --collector.cpu.info
+        - --collector.diskstats
+        - --collector.textfile.directory=/var/lib/node_exporter/textfile_collector
+        ports:
+        - containerPort: 9100
+          hostPort: 9100
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        volumeMounts:
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: root
+          mountPath: /host/root
+          readOnly: true
+          mountPropagation: HostToContainer
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: root
+        hostPath:
+          path: /
+      - name: proc
+        hostPath:
+          path: /proc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    app.kubernetes.io/name: node-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 9100
+    targetPort: 9100
+    protocol: TCP
+  selector:
+    app: node-exporter

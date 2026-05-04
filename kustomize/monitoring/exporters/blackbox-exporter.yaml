@@ -1,0 +1,126 @@
+---
+# Blackbox Exporter (network, http, dns probing)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/component: exporter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter-config
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+    app.kubernetes.io/name: blackbox-exporter
+data:
+  blackbox.yml: |
+    modules:
+      http_2xx:
+        prober: http
+        timeout: 5s
+        http:
+          preferred_ip_protocol: ip4
+      icmp:
+        prober: icmp
+        timeout: 5s
+      dns:
+        prober: dns
+        timeout: 5s
+        dns:
+          query_name: kubernetes.default.svc.cluster.local
+          query_type: A
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+    app.kubernetes.io/name: blackbox-exporter
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
+    vmstation.io/component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: blackbox-exporter
+        app.kubernetes.io/name: blackbox-exporter
+    spec:
+      serviceAccountName: blackbox-exporter
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: blackbox-exporter
+        image: prom/blackbox-exporter:v0.25.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - '--config.file=/etc/blackbox/blackbox.yml'
+        securityContext:
+          capabilities:
+            add:
+              - NET_RAW
+        ports:
+        - containerPort: 9115
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/blackbox
+      volumes:
+      - name: config
+        configMap:
+          name: blackbox-exporter-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox-exporter
+  namespace: monitoring
+  labels:
+    app: blackbox-exporter
+    app.kubernetes.io/name: blackbox-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9115"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9115
+    targetPort: 9115
+    name: http
+  selector:
+    app: blackbox-exporter

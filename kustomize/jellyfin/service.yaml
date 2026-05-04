@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin-service
+  namespace: jellyfin
+  labels:
+    app: jellyfin
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: media-server
+spec:
+  type: NodePort
+  ports:
+    - port: 8096
+      targetPort: 8096
+      nodePort: 30096
+      name: http
+      protocol: TCP
+  selector:
+    app: jellyfin
+    component: media-server

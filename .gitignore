@@ -1,0 +1,25 @@
+# Ansible
+*.retry
+/ansible/inventory/secrets.yml
+/tmp/
+.ansible/
+
+# Bootstrap state
+bootstrap/.install-state
+bootstrap/.rollback-log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets — never commit these
+*secrets*.yml
+*secret*.env
+*.key
+*.pem

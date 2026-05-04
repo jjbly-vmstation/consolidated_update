@@ -1,0 +1,13 @@
+---
+# VMStation Jellyfin Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jellyfin
+  labels:
+    name: jellyfin
+    vmstation.io/component: media
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: media-server
+    app.kubernetes.io/part-of: vmstation
+    pod-security.kubernetes.io/enforce: privileged

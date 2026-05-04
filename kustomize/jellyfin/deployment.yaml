@@ -1,0 +1,119 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: jellyfin
+  labels:
+    app: jellyfin
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: media-server
+    app.kubernetes.io/part-of: vmstation
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: jellyfin
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+        component: media-server
+        app.kubernetes.io/name: jellyfin
+        app.kubernetes.io/component: media-server
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: fix-config-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chown -R 1000:1000 /config"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: jellyfin-config
+              mountPath: /config
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:10.10
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8096
+              name: http
+              protocol: TCP
+            - containerPort: 8920
+              name: https
+              protocol: TCP
+          env:
+            - name: JELLYFIN_HTTP_BIND_ADDRESS
+              value: "0.0.0.0"
+            - name: JELLYFIN_HTTP_PORT
+              value: "8096"
+            - name: JELLYFIN_LOG_LEVEL
+              value: "Information"
+            - name: JELLYFIN_PublishedServerUrl
+              value: "http://192.168.4.61:30096"
+          volumeMounts:
+            - name: jellyfin-config
+              mountPath: /config
+            - name: jellyfin-cache
+              mountPath: /cache
+            - name: jellyfin-media
+              mountPath: /media
+              readOnly: true
+          resources:
+            requests:
+              cpu: "2"
+              memory: "1Gi"
+            limits:
+              cpu: "6"
+              memory: "3Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8096
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            timeoutSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8096
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8096
+            initialDelaySeconds: 180
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 40
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      dnsPolicy: ClusterFirst
+      volumes:
+        - name: jellyfin-config
+          persistentVolumeClaim:
+            claimName: jellyfin-config-pvc
+        - name: jellyfin-cache
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: jellyfin-media
+          hostPath:
+            path: /mnt/media
+            type: Directory
+      restartPolicy: Always

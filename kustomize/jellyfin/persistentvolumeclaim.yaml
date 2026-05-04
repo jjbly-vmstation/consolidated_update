@@ -1,0 +1,39 @@
+---
+# Jellyfin Configuration PVC
+# For production, use appropriate StorageClass or hostPath
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-config-pvc
+  namespace: jellyfin
+  labels:
+    app: jellyfin
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: config
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # Bind to the static hostPath PV (pinned to storagenodet3500)
+  storageClassName: ""
+  volumeName: jellyfin-config-pv
+---
+# Jellyfin Media PVC (optional - can use hostPath for large media)
+# Uncomment if using dynamic provisioning for media storage
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: jellyfin-media-pvc
+#   namespace: jellyfin
+#   labels:
+#     app: jellyfin
+#     app.kubernetes.io/name: jellyfin
+#     app.kubernetes.io/component: media
+# spec:
+#   accessModes:
+#     - ReadOnlyMany
+#   resources:
+#     requests:
+#       storage: 500Gi

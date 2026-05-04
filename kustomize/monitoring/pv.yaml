@@ -1,0 +1,53 @@
+---
+# NFS-backed PVs for monitoring data — served from storagenodet3500 (192.168.4.61)
+# Ensure /srv/monitoring_data/{prometheus,grafana,loki} exist and are exported via NFS.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-prometheus
+  labels:
+    app: prometheus
+spec:
+  capacity:
+    storage: 25Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  nfs:
+    server: 192.168.4.61
+    path: /srv/monitoring_data/prometheus
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-grafana
+  labels:
+    app: grafana
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  nfs:
+    server: 192.168.4.61
+    path: /srv/monitoring_data/grafana
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-loki
+  labels:
+    app: loki
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  nfs:
+    server: 192.168.4.61
+    path: /srv/monitoring_data/loki

@@ -1,0 +1,11 @@
+---
+# VMStation Monitoring Namespace
+# This namespace contains all monitoring stack components
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    vmstation.io/component: monitoring
+    app.kubernetes.io/part-of: vmstation-monitoring-stack
