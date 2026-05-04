@@ -68,3 +68,5 @@
       ansible.builtin.debug:
         msg: "{{ pod_status.stdout_lines }}"
       tags: [status]
+
+

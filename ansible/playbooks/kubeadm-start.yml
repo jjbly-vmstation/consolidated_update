@@ -68,6 +68,14 @@
       changed_when: true
       tags: [join]
 
+    - name: Label storage node
+      ansible.builtin.command:
+        cmd: kubectl label node {{ item }} storage=enabled --node-role.kubernetes.io/worker=storage --overwrite
+      loop: "{{ groups['workers'] }}"
+      changed_when: true
+      tags: [storage]
+
+
     - name: Show nodes status
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} get nodes
@@ -79,3 +87,4 @@
       ansible.builtin.debug:
         msg: "{{ node_status.stdout_lines }}"
       tags: [status]
+
