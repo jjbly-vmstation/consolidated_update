@@ -60,7 +60,7 @@
       tags: [packages]
 
     - name: Configure chrony to use AD DC as NTP source
-      ansible.builtin.template:
+      ansible.builtin.copy:
         dest: "{{ chrony_config_path }}"
         owner: root
         group: root
