@@ -244,14 +244,28 @@
       vmstation.local
     ```
 
-    **Step 3 (if still failing) — Relax LDAP signing on the DC:**
-    Open **Group Policy Management** → **Default Domain Controllers Policy**:
+    **Step 3 (if still failing) — Relax LDAP channel binding on the DC:**
+
+    Windows Server 2025 enforces LDAP channel binding and signing by default.
+    The password-set step (`unicodePwd` LDAP modify) fails because the session
+    key offered for signing is RC4/DES — which the Linux krb5.conf correctly
+    blocks — and no AES-keyed channel is negotiated for that step.
+
+    Run on **WSDC-Homelab** PowerShell (Administrator):
+    ```powershell
+    # 0 = never require channel binding (2 = always, default on WS2025)
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" `
+      -Name "LdapEnforceChannelBinding" -Value 0 -Type DWord
+
+    # 1 = negotiate signing (2 = require, which blocks unsigned password-set)
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" `
+      -Name "LDAPServerIntegrity" -Value 1 -Type DWord
+
+    Restart-Service NTDS -Force
     ```
-    Computer Configuration → Policies → Windows Settings → Security Settings
-      → Local Policies → Security Options
-        → "Domain controller: LDAP server signing requirements" → None
-    ```
-    Then force a refresh: `gpupdate /force`
+
+    Then retry `realm join` on the Linux node. The account creation will
+    succeed and the password set will complete.
 
 ### Why this is the "Pro" way:
 *   **Security:** If the `s_k8s_join` account is ever compromised, the attacker can only mess with the computers in that specific `K8s_Nodes` folder, not your entire domain.
