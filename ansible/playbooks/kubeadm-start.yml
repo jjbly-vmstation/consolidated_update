@@ -59,22 +59,45 @@
         msg: "{{ join_command.stdout }}"
       tags: [join]
 
-    - name: Join workers to cluster
+    - name: Reset any existing kubeadm state on workers
       ansible.builtin.command:
-        cmd: "{{ join_command.stdout }}"
-        creates: /etc/kubernetes/kubelet.conf
+        cmd: kubeadm reset -f
       delegate_to: "{{ item }}"
       loop: "{{ groups['workers'] }}"
       changed_when: true
       tags: [join]
 
-    - name: Label storage node
+    - name: Join workers to cluster
       ansible.builtin.command:
-        cmd: kubectl label node {{ item }} storage=enabled --node-role.kubernetes.io/worker=storage --overwrite
+        cmd: "{{ join_command.stdout }}"
+      delegate_to: "{{ item }}"
       loop: "{{ groups['workers'] }}"
       changed_when: true
-      tags: [storage]
+      tags: [join]
 
+    - name: Fix kubelet.conf server address on workers
+      ansible.builtin.replace:
+        path: /etc/kubernetes/kubelet.conf
+        regexp: 'server: https://localhost:6443'
+        replace: 'server: https://{{ control_plane_endpoint }}'
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      tags: [join]
+
+    - name: Restart kubelet on workers
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      tags: [join]
+
+    - name: Label workers with node-role.kubernetes.io/worker=worker
+      ansible.builtin.command:
+        cmd: kubectl label node {{ item }} node-role.kubernetes.io/worker=storage --overwrite
+      loop: "{{ groups['workers'] }}"
+      changed_when: true
+      tags: [join]
 
     - name: Show nodes status
       ansible.builtin.command:
