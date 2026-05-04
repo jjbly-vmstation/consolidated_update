@@ -19,11 +19,15 @@ spec:
         app.kubernetes.io/name: ingress-nginx
     spec:
       serviceAccountName: nginx-ingress
-      # Bind directly to port 80/443 on the storage node — no NodePort needed
+      # Bind directly to port 80/443 on the masternode — no NodePort needed
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
-        vmstation/role: storage
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
       terminationGracePeriodSeconds: 300
       containers:
       - name: controller
