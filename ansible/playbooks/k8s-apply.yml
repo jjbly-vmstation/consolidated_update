@@ -14,7 +14,7 @@
   gather_facts: false
 
   vars:
-    kubeconfig: /etc/kubernetes/admin.conf
+    kubeconfig: /home/jjbly/.kube/config
     repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
@@ -35,27 +35,6 @@
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/nextcloud
       changed_when: true
       tags: [nextcloud]
-
-    - name: Wait for monitoring pods to be ready
-      ansible.builtin.command:
-        cmd: kubectl --kubeconfig={{ kubeconfig }} -n monitoring wait pod --all --for=condition=Ready --timeout=300s
-      changed_when: false
-      failed_when: false
-      tags: [monitoring, wait]
-
-    - name: Wait for Jellyfin pod to be ready
-      ansible.builtin.command:
-        cmd: kubectl --kubeconfig={{ kubeconfig }} -n jellyfin wait pod --all --for=condition=Ready --timeout=300s
-      changed_when: false
-      failed_when: false
-      tags: [jellyfin, wait]
-
-    - name: Wait for Nextcloud pods to be ready
-      ansible.builtin.command:
-        cmd: kubectl --kubeconfig={{ kubeconfig }} -n nextcloud wait pod --all --for=condition=Ready --timeout=300s
-      changed_when: false
-      failed_when: false
-      tags: [nextcloud, wait]
 
     - name: Show pod status
       ansible.builtin.command:
