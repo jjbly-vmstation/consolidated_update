@@ -112,9 +112,14 @@
       when: not item.stat.exists
       tags: [join]
 
-    - name: Label workers with node-role.kubernetes.io/worker=worker
+    - name: Label workers
       ansible.builtin.command:
-        cmd: kubectl label node {{ item }} node-role.kubernetes.io/worker=storage --overwrite
+        cmd: >-
+          kubectl --kubeconfig={{ kubeconfig }} label node
+          {{ item }}.{{ cluster_domain }}
+          node-role.kubernetes.io/worker=storage
+          vmstation/role=storage
+          --overwrite
       loop: "{{ groups['workers'] }}"
       changed_when: true
       tags: [join]

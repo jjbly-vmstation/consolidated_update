@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/component: app
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500.vmstation.local
+        vmstation/role: storage
       initContainers:
         - name: prep-data-dir
           image: alpine:3.19

@@ -22,7 +22,7 @@ spec:
         app.kubernetes.io/component: mariadb
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500.vmstation.local
+        vmstation/role: storage
       containers:
         - name: mariadb
           image: mariadb:10.11

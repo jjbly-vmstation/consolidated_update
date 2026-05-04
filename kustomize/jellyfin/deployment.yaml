@@ -25,7 +25,7 @@ spec:
         app.kubernetes.io/component: media-server
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500.vmstation.local
+        vmstation/role: storage
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
