@@ -6,7 +6,7 @@
 
 - name: Get kubeadm join command
   hosts: control_plane
-  become: false
+  become: true
   gather_facts: false
 
   vars:
@@ -15,9 +15,25 @@
 
   tasks:
     - name: Rev it up
+      args:
+        creates: /etc/kubernetes/admin.conf
       ansible.builtin.command:
-        cmd: kubeadm init
-      changed_when: false
+        cmd: kubeadm init --control-plane-endpoint "masternode:6443" --pod-network-cidr="10.244.0.0/16" --service-cidr="10.96.0.0/12"
+      changed_when: true
+    
+    - name: Set up kubeconfig for jjbly
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/jjbly/.kube/config
+        remote_src: true
+        owner: jjbly
+        group: jjbly
+        mode: '0600'
+
+    - name: Apply Calico CNI
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f https://docs.projectcalico.org/manifests/calico.yaml
+        creates: /etc/cni/net.d/10-calico.conflist
 
     - name: Get kubeadm join command
       ansible.builtin.command:
