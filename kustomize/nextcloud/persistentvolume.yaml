@@ -16,7 +16,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/nextcloud/nextcloud
+    path: /srv/media/k8s/nextcloud
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -43,7 +43,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/nextcloud/mariadb
+    path: /srv/media/k8s/mariadb
   nodeAffinity:
     required:
       nodeSelectorTerms:
