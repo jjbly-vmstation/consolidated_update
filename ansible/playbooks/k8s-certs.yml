@@ -10,6 +10,7 @@
 - name: Generate wildcard cert from AD CA
   hosts: homelab
   gather_facts: false
+  become: false
 
   vars:
     ad_ca_name: "wsdc-homelab-CA"
