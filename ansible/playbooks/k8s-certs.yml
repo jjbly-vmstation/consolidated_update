@@ -59,10 +59,17 @@
         certreq -new -q "{{ temp_dir }}\wildcard.inf" "{{ temp_dir }}\wildcard.csr"
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    - name: Discover CA config string
+      ansible.windows.win_shell: |
+        $ca = (certutil -CAinfo | Select-String "Config" | Select-Object -First 1).Line -replace ".*Config:\s*", "" -replace "\s+$", ""
+        if (-not $ca) { Write-Error "No CA found"; exit 1 }
+        Write-Output $ca
+      register: ca_config
+      changed_when: false
+
     - name: Submit CSR to AD CA
       ansible.windows.win_shell: |
-        certreq -submit -q -config "wsdc-homelab\{{ ad_ca_name }}" `
-          "{{ temp_dir }}\wildcard.csr" "{{ temp_dir }}\wildcard.cer"
+        certreq -submit -q -config "{{ ca_config.stdout_lines[0] }}" "{{ temp_dir }}\wildcard.csr" "{{ temp_dir }}\wildcard.cer"
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - name: Accept cert into user store
