@@ -43,6 +43,12 @@
       changed_when: true
       tags: [nextcloud]
 
+    - name: Apply Vaultwarden
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/vaultwarden
+      changed_when: true
+      tags: [vaultwarden]
+
     - name: Show pod status
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} get pods -A

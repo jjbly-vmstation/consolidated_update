@@ -1,0 +1,38 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vaultwarden-ingress
+  namespace: vaultwarden
+  labels:
+    app: vaultwarden
+    app.kubernetes.io/name: vaultwarden
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # WebSocket support for real-time sync
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - vault.lan
+      secretName: vmstation-wildcard-tls
+  rules:
+    - host: vault.lan
+      http:
+        paths:
+          - path: /notifications/hub
+            pathType: Prefix
+            backend:
+              service:
+                name: vaultwarden
+                port:
+                  number: 3012
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vaultwarden
+                port:
+                  number: 80

@@ -106,6 +106,7 @@
       - jellyfin
       - monitoring
       - nextcloud
+      - vaultwarden
 
   tasks:
     - name: Extract TLS cert from PFX
