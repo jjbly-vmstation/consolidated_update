@@ -1,6 +1,6 @@
 ---
-# NFS-backed PVs for monitoring data — served from storagenodet3500 (192.168.4.61)
-# Ensure /srv/monitoring_data/{prometheus,grafana,loki} exist and are exported via NFS.
+# Local PVs for monitoring data — stored on masternode at /srv/monitoring_data
+# Ensure /srv/monitoring_data/{prometheus,grafana,loki} exist on masternode.vmstation.local.
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -11,12 +11,19 @@ spec:
   capacity:
     storage: 25Gi
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  nfs:
-    server: 192.168.4.61
+  local:
     path: /srv/monitoring_data/prometheus
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - masternode.vmstation.local
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -28,12 +35,19 @@ spec:
   capacity:
     storage: 5Gi
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  nfs:
-    server: 192.168.4.61
+  local:
     path: /srv/monitoring_data/grafana
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - masternode.vmstation.local
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -45,9 +59,16 @@ spec:
   capacity:
     storage: 20Gi
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: manual
-  nfs:
-    server: 192.168.4.61
+  local:
     path: /srv/monitoring_data/loki
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - masternode.vmstation.local

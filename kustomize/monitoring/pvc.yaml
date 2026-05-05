@@ -9,7 +9,7 @@ spec:
   storageClassName: manual
   volumeName: pv-prometheus
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 25Gi
@@ -24,7 +24,7 @@ spec:
   storageClassName: manual
   volumeName: pv-loki
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 20Gi
@@ -41,7 +41,7 @@ spec:
   storageClassName: manual
   volumeName: pv-grafana
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
