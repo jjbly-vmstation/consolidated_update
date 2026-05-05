@@ -47,6 +47,7 @@
         - /var/lib/k8s/nextcloud
         - /var/lib/k8s/mariadb
       delegate_to: storagenodet3500
+      ignore_unreachable: true
       tags: [always]
 
     - name: Install cert-manager from official release
