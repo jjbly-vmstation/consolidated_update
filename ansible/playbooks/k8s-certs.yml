@@ -1,246 +1,83 @@
 ---
-# k8s-certs.yml — Request wildcard *.vmstation.local cert from AD CA
-# and install it as TLS secrets in each app namespace.
+# k8s-certs.yml — Set up Let's Encrypt TLS via cert-manager + Cloudflare DNS-01
+#
+# Replaces the old AD CA workflow. cert-manager issues and auto-renews certs
+# from Let's Encrypt using Cloudflare DNS-01 challenge — no cert installation
+# needed on any client device.
+#
+# Prerequisites:
+#   1. Create a Cloudflare API token at https://dash.cloudflare.com/profile/api-tokens
+#      with permissions: Zone → Zone → Read, Zone → DNS → Edit (for jjbly.uk only)
+#   2. Store the token in Ansible vault:
+#        ansible-vault edit ansible/inventory/secrets.yml
+#        Add: vault_cloudflare_api_token: "<your-token>"
 #
 # Usage:
-#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml --ask-vault-pass
 #
-# Re-run annually when the cert approaches expiry.
+# Re-run only when adding new services. cert-manager handles renewal automatically.
 
-- name: Generate wildcard cert from AD CA
+- name: Create jjbly.uk internal DNS zone on Windows DC
   hosts: homelab
   gather_facts: false
   become: false
 
   vars:
-    ad_ca_name: "wsdc-homelab-CA"
-    cert_template: "WebServer"
-    pfx_password: "{{ vault_pfx_export_password | default('TempCertExport!') }}"
-    temp_dir: 'C:\Temp\k8s-certs'
+    ingress_ip: "192.168.4.63"
+    internal_domain: "jjbly.uk"
+    service_hostnames:
+      - jellyfin
+      - nextcloud
+      - vault
+      - grafana
+      - prometheus
 
   tasks:
-    - name: Create temp directory on DC
-      ansible.windows.win_file:
-        path: "{{ temp_dir }}"
-        state: directory
-
-    - name: Write certreq INF for wildcard cert
-      ansible.windows.win_copy:
-        content: |
-          [Version]
-          Signature="$Windows NT$"
-
-          [NewRequest]
-          Subject = "CN=*.lan"
-          KeySpec = 1
-          KeyLength = 2048
-          Exportable = TRUE
-          MachineKeySet = TRUE
-          SMIME = False
-          PrivateKeyArchive = FALSE
-          UserProtected = FALSE
-          UseExistingKeySet = FALSE
-          ProviderName = "Microsoft RSA SChannel Cryptographic Provider"
-          ProviderType = 12
-          RequestType = PKCS10
-          KeyUsage = 0xa0
-          HashAlgorithm = SHA256
-
-          [EnhancedKeyUsageExtension]
-          OID = 1.3.6.1.5.5.7.3.1
-
-          [Extensions]
-          2.5.29.17 = "{text}"
-          _continue_ = "dns=*.lan&"
-          _continue_ = "dns=lan&"
-          _continue_ = "dns=vault.lan&"
-          _continue_ = "dns=jellyfin.lan&"
-          _continue_ = "dns=nextcloud.lan&"
-          _continue_ = "dns=grafana.lan&"
-          _continue_ = "dns=prometheus.lan&"
-
-          [RequestAttributes]
-          CertificateTemplate = {{ cert_template }}
-        dest: '{{ temp_dir }}\wildcard.inf'
-
-    - name: Remove stale cert files from previous runs
-      ansible.windows.win_file:
-        path: "{{ temp_dir }}\\{{ item }}"
-        state: absent
-      loop:
-        - wildcard.rsp
-        - wildcard.csr
-        - wildcard.cer
-        - wildcard.pfx
-
-    - name: Generate CSR
+    - name: Create jjbly.uk primary DNS zone on AD DC (idempotent)
       ansible.windows.win_shell: |
-        certreq -new -q "{{ temp_dir }}\wildcard.inf" "{{ temp_dir }}\wildcard.csr"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    - name: Discover CA config string from Active Directory
-      ansible.windows.win_shell: |
-        $searchBase = "CN=Enrollment Services,CN=Public Key Services,CN=Services,CN=Configuration,DC=vmstation,DC=local"
-        $ca = Get-ADObject -SearchBase $searchBase -Filter { objectClass -eq "pKIEnrollmentService" } -Properties dNSHostName, cn | Select-Object -First 1
-        if (-not $ca) { Write-Error "No CA found in AD — is AD CS installed and certsvc running?"; exit 1 }
-        Write-Output "$($ca.dNSHostName)\$($ca.cn)"
-      register: ca_config
-      changed_when: false
-
-    - name: Submit CSR to AD CA
-      ansible.windows.win_shell: |
-        certreq -submit -q -config "{{ ca_config.stdout_lines[0] }}" "{{ temp_dir }}\wildcard.csr" "{{ temp_dir }}\wildcard.cer"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    - name: Accept cert into user store
-      ansible.windows.win_shell: |
-        certreq -accept -q "{{ temp_dir }}\wildcard.cer"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    - name: Export cert + chain as PFX
-      ansible.windows.win_shell: |
-        $thumb = (Get-ChildItem Cert:\LocalMachine\My |
-          Where-Object { $_.Subject -match [regex]::Escape('*.lan') } |
-          Sort-Object NotAfter -Descending |
-          Select-Object -First 1).Thumbprint
-        if (-not $thumb) { Write-Error "Cert not found in store"; exit 1 }
-        $pwd = ConvertTo-SecureString -String "{{ pfx_password }}" -Force -AsPlainText
-        Export-PfxCertificate -Cert "Cert:\LocalMachine\My\$thumb" `
-          -FilePath "{{ temp_dir }}\wildcard.pfx" `
-          -Password $pwd -ChainOption BuildChain -Force
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    - name: Fetch PFX to controller
-      ansible.builtin.fetch:
-        src: '{{ temp_dir }}\wildcard.pfx'
-        dest: /tmp/vmstation-wildcard.pfx
-        flat: true
-
-    - name: Export AD CA root certificate
-      ansible.windows.win_shell: |
-        $ca = Get-ChildItem Cert:\LocalMachine\Root |
-          Where-Object { $_.Subject -match "wsdc-homelab-CA" } |
-          Sort-Object NotAfter -Descending |
-          Select-Object -First 1
-        if (-not $ca) {
-          # Fall back: find any CA cert that issued our domain cert
-          $ca = Get-ChildItem Cert:\LocalMachine\Root |
-            Where-Object { $_.Subject -match "vmstation" } |
-            Sort-Object NotAfter -Descending |
-            Select-Object -First 1
+        if (-not (Get-DnsServerZone -Name "{{ internal_domain }}" -ErrorAction SilentlyContinue)) {
+            Add-DnsServerPrimaryZone -Name "{{ internal_domain }}" -ZoneFile "{{ internal_domain }}.dns" -DynamicUpdate None
+            Write-Output "created"
+        } else {
+            Write-Output "exists"
         }
-        if (-not $ca) { Write-Error "Root CA cert not found in LocalMachine\Root store"; exit 1 }
-        Export-Certificate -Cert $ca -FilePath "{{ temp_dir }}\vmstation-root-ca.cer" -Type CERT -Force | Out-Null
-        Write-Output $ca.Subject
-      register: ca_export
-      changed_when: true
+      register: zone_result
+      changed_when: "'created' in zone_result.stdout"
 
-    - name: Fetch CA root cert to controller
-      ansible.builtin.fetch:
-        src: '{{ temp_dir }}\vmstation-root-ca.cer'
-        dest: /tmp/vmstation-root-ca.cer
-        flat: true
+    - name: Add A records for each service (idempotent)
+      ansible.windows.win_shell: |
+        $existing = Get-DnsServerResourceRecord -ZoneName "{{ internal_domain }}" -Name "{{ item }}" -RRType A -ErrorAction SilentlyContinue
+        if (-not $existing) {
+            Add-DnsServerResourceRecordA -ZoneName "{{ internal_domain }}" -Name "{{ item }}" -IPv4Address "{{ ingress_ip }}" -TimeToLive 01:00:00
+            Write-Output "created"
+        } else {
+            Write-Output "exists"
+        }
+      loop: "{{ service_hostnames }}"
+      register: record_result
+      changed_when: "'created' in record_result.stdout"
 
-    - name: Convert CA cert to PEM for Linux/Android distribution
-      ansible.builtin.shell: |
-        openssl x509 -inform DER -in /tmp/vmstation-root-ca.cer \
-          -out /tmp/vmstation-root-ca.crt
-      delegate_to: localhost
-
-    - name: Remove temp files from DC
-      ansible.windows.win_file:
-        path: "{{ temp_dir }}"
-        state: absent
-
-- name: Install wildcard TLS secret in Kubernetes
+- name: Install Cloudflare API token secret for cert-manager
   hosts: control_plane
   become: false
   gather_facts: false
 
   vars:
     kubeconfig: /home/jjbly/.kube/config
-    pfx_password: "{{ vault_pfx_export_password | default('TempCertExport!') }}"
-    pfx_path: /tmp/vmstation-wildcard.pfx
-    cert_namespaces:
-      - jellyfin
-      - monitoring
-      - nextcloud
-      - vaultwarden
 
   tasks:
-    - name: Extract TLS cert from PFX
-      # -legacy handles Windows PKCS12 with RC2/3DES (required on OpenSSL 3.x)
+    - name: Ensure cert-manager namespace exists
       ansible.builtin.shell: |
-        openssl pkcs12 -in {{ pfx_path }} \
-          -nokeys -clcerts \
-          -out /tmp/vmstation-tls.crt \
-          -passin pass:"{{ pfx_password }}" -legacy 2>/dev/null || \
-        openssl pkcs12 -in {{ pfx_path }} \
-          -nokeys -clcerts \
-          -out /tmp/vmstation-tls.crt \
-          -passin pass:"{{ pfx_password }}"
-      changed_when: true
-
-    - name: Extract TLS key from PFX
-      ansible.builtin.shell: |
-        openssl pkcs12 -in {{ pfx_path }} \
-          -nocerts -nodes \
-          -out /tmp/vmstation-tls.key \
-          -passin pass:"{{ pfx_password }}" -legacy 2>/dev/null || \
-        openssl pkcs12 -in {{ pfx_path }} \
-          -nocerts -nodes \
-          -out /tmp/vmstation-tls.key \
-          -passin pass:"{{ pfx_password }}"
-      changed_when: true
-
-    - name: Ensure namespaces exist
-      ansible.builtin.shell: |
-        kubectl --kubeconfig={{ kubeconfig }} create namespace {{ item }} --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} create namespace cert-manager --dry-run=client -o yaml | \
         kubectl --kubeconfig={{ kubeconfig }} apply -f -
-      loop: "{{ cert_namespaces }}"
       changed_when: false
 
-    - name: Install TLS secret in each namespace
+    - name: Create Cloudflare API token secret
       ansible.builtin.shell: |
-        kubectl --kubeconfig={{ kubeconfig }} \
-          create secret tls vmstation-wildcard-tls \
-          --cert=/tmp/vmstation-tls.crt \
-          --key=/tmp/vmstation-tls.key \
-          -n {{ item }} \
+        kubectl --kubeconfig={{ kubeconfig }} create secret generic cloudflare-api-token \
+          --from-literal=api-token="{{ vault_cloudflare_api_token }}" \
+          -n cert-manager \
           --dry-run=client -o yaml | \
         kubectl --kubeconfig={{ kubeconfig }} apply -f -
-      loop: "{{ cert_namespaces }}"
       changed_when: true
-
-    - name: Remove local cert files
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ pfx_path }}"
-        - /tmp/vmstation-tls.crt
-        - /tmp/vmstation-tls.key
-
-- name: Trust AD CA root cert on Linux nodes and expose for device enrollment
-  hosts: linux_nodes
-  become: true
-  gather_facts: true
-
-  tasks:
-    - name: Copy CA root cert to system trust store
-      ansible.builtin.copy:
-        src: /tmp/vmstation-root-ca.crt
-        dest: /usr/local/share/ca-certificates/vmstation-root-ca.crt
-        mode: '0644'
-
-    - name: Update CA trust
-      ansible.builtin.command: update-ca-certificates
-      changed_when: true
-
-    - name: Expose CA cert via nginx for device enrollment
-      # Browse to http://<any-node-ip>/vmstation-root-ca.crt on your phone to install
-      ansible.builtin.copy:
-        src: /tmp/vmstation-root-ca.crt
-        dest: /var/www/html/vmstation-root-ca.crt
-        mode: '0644'
-      ignore_errors: true   # skip silently if nginx is not installed on this node
+      no_log: true
