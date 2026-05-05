@@ -28,7 +28,7 @@ spec:
       containers:
         - name: nodectl
           image: python:3.12-alpine
-          command: ["python3", "/app/server.py"]
+          command: ["sh", "-c", "apk add --no-cache openssh-client && python3 /app/server.py"]
           ports:
             - containerPort: 8080
               name: http
