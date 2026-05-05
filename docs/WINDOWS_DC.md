@@ -35,18 +35,33 @@ ansible-vault create ansible/inventory/secrets.yml
 
 ## DNS configuration
 
-AD DC is authoritative for `vmstation.local`. masternode runs BIND9 as a
-forwarding secondary — all LAN queries go to 192.168.4.62 first.
+AD DC is authoritative for `vmstation.local` and `jjbly.uk` (internal split-brain).
+All LAN clients resolve through 192.168.4.62. The `jjbly.uk` zone is internal-only —
+Cloudflare is the public authoritative DNS but does NOT have A records for these
+services (they are LAN-only). cert-manager uses Cloudflare only to create TXT
+records for Let's Encrypt DNS-01 challenge, then removes them.
 
-DNS records to create on AD DC:
+DNS records managed by `k8s-certs.yml` ansible playbook:
 
-| Name | Type | Value |
-|------|------|-------|
-| masternode | A | 192.168.4.63 |
-| storagenodet3500 | A | 192.168.4.61 |
-| jellyfin.lan | A | 192.168.4.61 |
-| nextcloud.lan | A | 192.168.4.63 |
-| grafana.lan | A | 192.168.4.63 |
+| Name | Type | Value | Zone | Note |
+|------|------|-------|------|------|
+| masternode | A | 192.168.4.63 | vmstation.local | cluster control plane |
+| storagenodet3500 | A | 192.168.4.61 | vmstation.local | storage node |
+| jellyfin | A | 192.168.4.63 | jjbly.uk | ingress controller |
+| nextcloud | A | 192.168.4.63 | jjbly.uk | ingress controller |
+| vault | A | 192.168.4.63 | jjbly.uk | ingress controller |
+| grafana | A | 192.168.4.63 | jjbly.uk | ingress controller |
+| prometheus | A | 192.168.4.63 | jjbly.uk | ingress controller |
+
+The `k8s-certs.yml` playbook creates the zone and records automatically.
+To create manually:
+```powershell
+Add-DnsServerPrimaryZone -Name "jjbly.uk" -ZoneFile "jjbly.uk.dns" -DynamicUpdate None
+$ip = "192.168.4.63"
+foreach ($name in @("jellyfin","nextcloud","vault","grafana","prometheus")) {
+    Add-DnsServerResourceRecordA -ZoneName "jjbly.uk" -Name $name -IPv4Address $ip -TimeToLive 01:00:00
+}
+```
 
 ## Hyper-V VM subnet
 

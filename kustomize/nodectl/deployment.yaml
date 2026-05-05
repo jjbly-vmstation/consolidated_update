@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodectl
+  namespace: nodectl
+  labels:
+    app: nodectl
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nodectl
+  template:
+    metadata:
+      labels:
+        app: nodectl
+    spec:
+      # Must run on masternode with hostNetwork so WoL broadcasts
+      # reach the physical LAN (192.168.4.0/24)
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nodectl
+          image: python:3.12-alpine
+          command: ["sh", "-c", "apk add --no-cache openssh-client && python3 /app/server.py"]
+          ports:
+            - containerPort: 8080
+              name: http
+              hostPort: 8080
+          volumeMounts:
+            - name: script
+              mountPath: /app/server.py
+              subPath: server.py
+            - name: ssh-key
+              mountPath: /ssh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: script
+          configMap:
+            name: nodectl-script
+            defaultMode: 0755
+        - name: ssh-key
+          secret:
+            secretName: nodectl-ssh-key
+            defaultMode: 0400
