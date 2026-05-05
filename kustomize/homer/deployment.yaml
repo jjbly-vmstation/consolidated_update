@@ -1,56 +1,71 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: homer
+  name: homepage
   namespace: homer
   labels:
-    app: homer
-    app.kubernetes.io/name: homer
+    app: homepage
+    app.kubernetes.io/name: homepage
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: homer
+      app: homepage
   template:
     metadata:
       labels:
-        app: homer
+        app: homepage
     spec:
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - name: homer
-          image: b4bz/homer:latest
-          imagePullPolicy: IfNotPresent
+        - name: homepage
+          image: ghcr.io/gethomepage/homepage:latest
+          imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 3000
               name: http
+          env:
+            - name: HOMEPAGE_ALLOWED_HOSTS
+              value: "home.jjbly.uk"
           volumeMounts:
             - name: config
-              mountPath: /www/assets/config.yml
-              subPath: config.yml
+              mountPath: /app/config/settings.yaml
+              subPath: settings.yaml
+            - name: config
+              mountPath: /app/config/services.yaml
+              subPath: services.yaml
+            - name: config
+              mountPath: /app/config/widgets.yaml
+              subPath: widgets.yaml
+            - name: config
+              mountPath: /app/config/bookmarks.yaml
+              subPath: bookmarks.yaml
+            - name: config
+              mountPath: /app/config/docker.yaml
+              subPath: docker.yaml
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
               memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           readinessProbe:
             httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 5
+              path: /api/healthcheck
+              port: 3000
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 10
+              path: /api/healthcheck
+              port: 3000
+            initialDelaySeconds: 15
             periodSeconds: 30
       volumes:
         - name: config
           configMap:
-            name: homer-config
+            name: homepage-config

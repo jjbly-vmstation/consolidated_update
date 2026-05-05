@@ -1,66 +1,69 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: homer-config
+  name: homepage-config
   namespace: homer
 data:
-  config.yml: |
-    title: "jjbly homelab"
-    subtitle: "Home Network"
-    logo: "logo.png"
+  settings.yaml: |
+    title: jjbly homelab
+    theme: dark
+    color: slate
+    headerStyle: boxed
+    hideVersion: true
+    layout:
+      Media:
+        icon: mdi-play-circle
+        style: row
+        columns: 4
+      Productivity:
+        icon: mdi-cloud-outline
+        style: row
+        columns: 4
+      Monitoring:
+        icon: mdi-chart-line
+        style: row
+        columns: 4
 
-    header: true
-    footer: false
+  services.yaml: |
+    - Media:
+        - Jellyfin:
+            href: https://jellyfin.jjbly.uk
+            description: Movies, TV & Music
+            icon: jellyfin.png
 
-    colors:
-      light:
-        highlight-primary: "#3367d6"
-        highlight-secondary: "#4285f4"
-        highlight-hover: "#5a95f5"
-        background: "#f2f2f2"
-        card-background: "#ffffff"
-        text: "#363636"
-        text-header: "#ffffff"
-        text-title: "#303030"
-        text-subtitle: "#424242"
-        card-shadow: rgba(0, 0, 0, 0.1)
-        link: "#3273dc"
-        link-hover: "#363636"
+    - Productivity:
+        - Nextcloud:
+            href: https://nextcloud.jjbly.uk
+            description: Files & Sync
+            icon: nextcloud.png
+        - Vaultwarden:
+            href: https://vault.jjbly.uk
+            description: Password Manager
+            icon: vaultwarden.png
 
-    services:
-      - name: "Media"
-        icon: "fas fa-photo-video"
-        items:
-          - name: "Jellyfin"
-            logo: "https://jellyfin.org/images/favicon.ico"
-            subtitle: "Movies, TV & Music"
-            url: "https://jellyfin.jjbly.uk"
-            target: "_blank"
+    - Monitoring:
+        - Grafana:
+            href: https://grafana.jjbly.uk
+            description: Dashboards & Alerts
+            icon: grafana.png
+        - Prometheus:
+            href: https://prometheus.jjbly.uk
+            description: Metrics
+            icon: prometheus.png
 
-      - name: "Productivity"
-        icon: "fas fa-cloud"
-        items:
-          - name: "Nextcloud"
-            logo: "https://nextcloud.com/wp-content/themes/next/assets/img/favicon.png"
-            subtitle: "Files & Sync"
-            url: "https://nextcloud.jjbly.uk"
-            target: "_blank"
-          - name: "Vaultwarden"
-            logo: "https://bitwarden.com/images/icons/favicon/favicon-32x32.png"
-            subtitle: "Password Manager"
-            url: "https://vault.jjbly.uk"
-            target: "_blank"
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+        label: Cluster Resources
 
-      - name: "Monitoring"
-        icon: "fas fa-chart-line"
-        items:
-          - name: "Grafana"
-            logo: "https://grafana.com/static/assets/img/fav32.png"
-            subtitle: "Dashboards & Alerts"
-            url: "https://grafana.jjbly.uk"
-            target: "_blank"
-          - name: "Prometheus"
-            logo: "https://prometheus.io/assets/favicons/favicon.ico"
-            subtitle: "Metrics"
-            url: "https://prometheus.jjbly.uk"
-            target: "_blank"
+    - search:
+        provider: google
+        target: _blank
+        focus: false
+
+  bookmarks.yaml: |
+    []
+
+  docker.yaml: |
+    {}
