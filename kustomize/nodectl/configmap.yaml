@@ -17,9 +17,12 @@ data:
     def send_wol():
         mac = bytes.fromhex(STORAGE_MAC.replace(":", ""))
         packet = b"\xff" * 6 + mac * 16
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.sendto(packet, ("255.255.255.255", 9))
+        for _ in range(3):
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                s.sendto(packet, ("255.255.255.255", 9))
+                s.sendto(packet, ("192.168.4.255", 9))
+            import time; time.sleep(1)
 
     def reply(h, code, body):
         data = json.dumps(body).encode()
