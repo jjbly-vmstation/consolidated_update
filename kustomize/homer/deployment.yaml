@@ -20,6 +20,22 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      initContainers:
+        - name: copy-config
+          image: busybox:latest
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - |
+              cp /config-src/* /app/config/
+              chown -R 1000:1000 /app/config/
+          volumeMounts:
+            - name: config-src
+              mountPath: /config-src
+            - name: config-dir
+              mountPath: /app/config
       containers:
         - name: homepage
           image: ghcr.io/gethomepage/homepage:latest
@@ -31,26 +47,8 @@ spec:
             - name: HOMEPAGE_ALLOWED_HOSTS
               value: "*"
           volumeMounts:
-            - name: config
-              mountPath: /app/config/settings.yaml
-              subPath: settings.yaml
-            - name: config
-              mountPath: /app/config/services.yaml
-              subPath: services.yaml
-            - name: config
-              mountPath: /app/config/widgets.yaml
-              subPath: widgets.yaml
-            - name: config
-              mountPath: /app/config/bookmarks.yaml
-              subPath: bookmarks.yaml
-            - name: config
-              mountPath: /app/config/docker.yaml
-              subPath: docker.yaml
-            - name: config
-              mountPath: /app/config/kubernetes.yaml
-              subPath: kubernetes.yaml
-            - name: logs
-              mountPath: /app/config/logs
+            - name: config-dir
+              mountPath: /app/config
           resources:
             requests:
               cpu: 10m
@@ -69,8 +67,8 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 30
       volumes:
-        - name: config
+        - name: config-src
           configMap:
             name: homepage-config
-        - name: logs
+        - name: config-dir
           emptyDir: {}
