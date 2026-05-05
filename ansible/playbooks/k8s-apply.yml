@@ -42,8 +42,9 @@
         state: directory
         mode: "0755"
       loop:
-        - /srv/media/nextcloud
-        - /srv/media/jellyfin-config
+        - /var/lib/jellyfin/config
+        - /var/lib/jellyfin/cache
+        - /var/lib/k8s/nextcloud
         - /var/lib/k8s/mariadb
       delegate_to: storagenodet3500
       tags: [always]
