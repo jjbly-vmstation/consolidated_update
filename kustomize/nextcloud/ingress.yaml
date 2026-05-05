@@ -1,31 +1,31 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: jellyfin-ingress
-  namespace: jellyfin
+  name: nextcloud-ingress
+  namespace: nextcloud
   labels:
-    app: jellyfin
-    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/name: nextcloud
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - jellyfin.jjbly.uk
-      secretName: jellyfin-jjbly-uk-tls
+        - nextcloud.jjbly.uk
+      secretName: nextcloud-jjbly-uk-tls
   rules:
-    - host: jellyfin.jjbly.uk
+    - host: nextcloud.jjbly.uk
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: jellyfin-service
+                name: nextcloud
                 port:
-                  number: 8096
+                  number: 80

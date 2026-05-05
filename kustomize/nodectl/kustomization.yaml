@@ -3,9 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - persistentvolume.yaml
-  - persistentvolumeclaim.yaml
-  - mariadb.yaml
-  - nextcloud.yaml
+  - configmap.yaml
+  - deployment.yaml
   - service.yaml
   - ingress.yaml

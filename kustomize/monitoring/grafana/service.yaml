@@ -1,5 +1,4 @@
 ---
-# Grafana Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -10,11 +9,10 @@ metadata:
     app.kubernetes.io/name: grafana
     app.kubernetes.io/component: visualization
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
   - port: 3000
     targetPort: 3000
-    nodePort: 30300
     name: web
   selector:
     app: grafana

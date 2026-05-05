@@ -21,6 +21,8 @@ spec:
         app.kubernetes.io/name: nextcloud
         app.kubernetes.io/component: mariadb
     spec:
+      nodeSelector:
+        vmstation/role: storage
       containers:
         - name: mariadb
           image: mariadb:10.11

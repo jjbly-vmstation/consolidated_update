@@ -36,15 +36,8 @@ spec:
       hostNetwork: true
       hostPID: true
       hostIPC: true
-      tolerations:
-      # Deploy on control plane nodes
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
-      # Deploy on master nodes (older k8s versions)
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
+      nodeSelector:
+        vmstation/role: storage
       containers:
       - name: node-exporter
         image: prom/node-exporter:v1.6.1

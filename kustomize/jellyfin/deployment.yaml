@@ -25,7 +25,7 @@ spec:
         app.kubernetes.io/component: media-server
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500
+        vmstation/role: storage
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -110,8 +110,8 @@ spec:
           persistentVolumeClaim:
             claimName: jellyfin-config-pvc
         - name: jellyfin-cache
-          emptyDir:
-            sizeLimit: 10Gi
+          persistentVolumeClaim:
+            claimName: jellyfin-cache-pvc
         - name: jellyfin-media
           hostPath:
             path: /mnt/media

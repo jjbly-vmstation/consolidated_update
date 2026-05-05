@@ -23,6 +23,11 @@
         name: chrony
         state: restarted
 
+    - name: restart containerd
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+
     - name: apply sysctl
       ansible.builtin.command: sysctl --system
       changed_when: true
@@ -55,13 +60,13 @@
       tags: [packages]
 
     - name: Configure chrony to use AD DC as NTP source
-      ansible.builtin.template:
+      ansible.builtin.copy:
         dest: "{{ chrony_config_path }}"
         owner: root
         group: root
         mode: '0644'
         content: |
-          # {{ ansible_managed }}
+          # Managed by Ansible - do not edit directly
           {% for server in ntp_servers %}
           server {{ server }} iburst
           {% endfor %}
@@ -163,11 +168,7 @@
         path: "{{ containerd_config_path }}"
         regexp: 'SystemdCgroup = false'
         replace: 'SystemdCgroup = true'
-      notify:
-        - name: restart containerd
-          ansible.builtin.service:
-            name: containerd
-            state: restarted
+      notify: restart containerd
       tags: [containerd]
 
     - name: Enable and start containerd

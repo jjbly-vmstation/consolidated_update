@@ -5,7 +5,10 @@ resources:
   - namespace.yaml
   - persistentvolume.yaml
   - persistentvolumeclaim.yaml
-  - mariadb.yaml
-  - nextcloud.yaml
+  - deployment.yaml
   - service.yaml
   - ingress.yaml
+
+images:
+  - name: vaultwarden/server
+    newTag: "1.32.7"

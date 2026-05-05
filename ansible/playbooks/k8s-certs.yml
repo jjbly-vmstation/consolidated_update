@@ -1,0 +1,111 @@
+---
+# k8s-certs.yml — Set up Let's Encrypt TLS via cert-manager + Cloudflare DNS-01
+#
+# Replaces the old AD CA workflow. cert-manager issues and auto-renews certs
+# from Let's Encrypt using Cloudflare DNS-01 challenge — no cert installation
+# needed on any client device.
+#
+# Prerequisites:
+#   1. Create a Cloudflare API token at https://dash.cloudflare.com/profile/api-tokens
+#      with permissions: Zone → Zone → Read, Zone → DNS → Edit (for jjbly.uk only)
+#   2. Store the token in Ansible vault:
+#        ansible-vault edit ansible/inventory/secrets.yml
+#        Add: vault_cloudflare_api_token: "<your-token>"
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml --ask-vault-pass
+#
+# Re-run only when adding new services. cert-manager handles renewal automatically.
+
+- name: Create jjbly.uk internal DNS zone on Windows DC
+  hosts: homelab
+  gather_facts: false
+  become: false
+
+  vars:
+    ingress_ip: "192.168.4.63"
+    internal_domain: "jjbly.uk"
+    service_hostnames:
+      - jellyfin
+      - nextcloud
+      - vault
+      - grafana
+      - prometheus
+      - home
+      - nodectl
+
+  tasks:
+    - name: Create jjbly.uk primary DNS zone on AD DC (idempotent)
+      ansible.windows.win_shell: |
+        if (-not (Get-DnsServerZone -Name "{{ internal_domain }}" -ErrorAction SilentlyContinue)) {
+            Add-DnsServerPrimaryZone -Name "{{ internal_domain }}" -ZoneFile "{{ internal_domain }}.dns" -DynamicUpdate None
+            Write-Output "created"
+        } else {
+            Write-Output "exists"
+        }
+      register: zone_result
+      changed_when: "'created' in zone_result.stdout"
+
+    - name: Add A records for each service (idempotent)
+      ansible.windows.win_shell: |
+        $existing = Get-DnsServerResourceRecord -ZoneName "{{ internal_domain }}" -Name "{{ item }}" -RRType A -ErrorAction SilentlyContinue
+        if (-not $existing) {
+            Add-DnsServerResourceRecordA -ZoneName "{{ internal_domain }}" -Name "{{ item }}" -IPv4Address "{{ ingress_ip }}" -TimeToLive 01:00:00
+            Write-Output "created"
+        } else {
+            Write-Output "exists"
+        }
+      loop: "{{ service_hostnames }}"
+      register: record_result
+      changed_when: "'created' in record_result.stdout"
+
+    - name: Remove old lan DNS zone (services moved to jjbly.uk)
+      ansible.windows.win_shell: |
+        if (Get-DnsServerZone -Name "lan" -ErrorAction SilentlyContinue) {
+            Remove-DnsServerZone -Name "lan" -Force
+            Write-Output "removed"
+        } else {
+            Write-Output "absent"
+        }
+      register: lan_zone_result
+      changed_when: "'removed' in lan_zone_result.stdout"
+
+- name: Install Cloudflare API token secret for cert-manager
+  hosts: control_plane
+  become: false
+  gather_facts: false
+
+  vars:
+    kubeconfig: /home/jjbly/.kube/config
+
+  tasks:
+    - name: Ensure cert-manager namespace exists
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create namespace cert-manager --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: false
+
+    - name: Create Cloudflare API token secret
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create secret generic cloudflare-api-token \
+          --from-literal=api-token="{{ vault_cloudflare_api_token }}" \
+          -n cert-manager \
+          --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: true
+      no_log: true
+
+    - name: Ensure nodectl namespace exists
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create namespace nodectl --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: false
+
+    - name: Create nodectl SSH key secret
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create secret generic nodectl-ssh-key \
+          --from-file=id_ed25519=/home/jjbly/.ssh/id_ed25519 \
+          -n nodectl \
+          --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: true

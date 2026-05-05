@@ -16,7 +16,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/nextcloud/nextcloud
+    path: /var/lib/k8s/nextcloud
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -24,7 +24,7 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
 ---
 # MariaDB PV — pinned to storagenodet3500 (homelab is now Windows)
 apiVersion: v1
@@ -43,7 +43,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/nextcloud/mariadb
+    path: /var/lib/k8s/mariadb
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -51,4 +51,4 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local

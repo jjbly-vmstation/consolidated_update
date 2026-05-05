@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodectl
+  namespace: nodectl
+  labels:
+    app: nodectl
+spec:
+  selector:
+    app: nodectl
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

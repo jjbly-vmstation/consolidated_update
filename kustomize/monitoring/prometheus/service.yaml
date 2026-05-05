@@ -1,5 +1,5 @@
 ---
-# Prometheus Service - ClusterIP for internal access (Headless)
+# Headless service — lets promtail/rules DNS resolve individual pod IPs
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,7 +14,7 @@ metadata:
     prometheus.io/port: "9090"
 spec:
   type: ClusterIP
-  clusterIP: None  # Headless service for StatefulSet
+  clusterIP: None
   ports:
   - port: 9090
     targetPort: 9090
@@ -23,36 +23,28 @@ spec:
   selector:
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/component: monitoring
-  # Session affinity for sticky sessions
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 10800
 ---
-# Prometheus Service - NodePort for external access
+# ClusterIP for ingress backend
 apiVersion: v1
 kind: Service
 metadata:
-  name: prometheus-external
+  name: prometheus-http
   namespace: monitoring
   labels:
     app: prometheus
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/component: monitoring
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
   - port: 9090
     targetPort: 9090
-    nodePort: 30090
     name: web
     protocol: TCP
   selector:
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/component: monitoring
 ---
-# NetworkPolicy for Prometheus - Enterprise Security
-# Controls ingress and egress traffic to Prometheus pods
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -69,7 +61,6 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # Allow Grafana to query Prometheus
   - from:
     - podSelector:
         matchLabels:
@@ -77,7 +68,6 @@ spec:
     ports:
     - protocol: TCP
       port: 9090
-  # Allow Prometheus to scrape itself
   - from:
     - podSelector:
         matchLabels:
@@ -85,13 +75,14 @@ spec:
     ports:
     - protocol: TCP
       port: 9090
-  # Allow external access via NodePort (from all sources)
-  - from: []
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
     ports:
     - protocol: TCP
       port: 9090
   egress:
-  # Allow Prometheus to scrape all pods in monitoring namespace
   - to:
     - podSelector: {}
     ports:
@@ -107,7 +98,6 @@ spec:
       port: 3100
     - protocol: TCP
       port: 3000
-  # Allow scraping kube-state-metrics
   - to:
     - podSelector:
         matchLabels:
@@ -115,9 +105,6 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
-  # Allow reaching the Kubernetes API server.
-  # Prometheus scrapes kubelet/cAdvisor via the API proxy through kubernetes.default.svc.
-  # Many CNIs enforce NetworkPolicy after Service DNAT, so the destination becomes the apiserver endpoint (node IP:6443).
   - to:
     - ipBlock:
         cidr: 192.168.4.0/24
@@ -126,9 +113,8 @@ spec:
       port: 443
     - protocol: TCP
       port: 6443
-
-  # Allow DNS resolution via CoreDNS (kube-system).
-  # Kubernetes sets the namespace label kubernetes.io/metadata.name automatically; do not rely on a custom 'name' label.
+    - protocol: TCP
+      port: 9100
   - to:
     - namespaceSelector:
         matchLabels:
@@ -141,17 +127,3 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-  # Allow scraping node exporters on host network
-  - to:
-    - ipBlock:
-        cidr: 192.168.4.0/24
-    ports:
-    - protocol: TCP
-      port: 9100
-  # Allow scraping external NTP servers (if monitoring them)
-  - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
-    ports:
-    - protocol: TCP
-      port: 9123

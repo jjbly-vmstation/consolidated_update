@@ -45,7 +45,7 @@
         dest: /etc/bind/named.conf.options
         mode: '0644'
         content: |
-          // {{ ansible_managed }}
+          // Managed by Ansible - do not edit directly
           options {
               directory "/var/cache/bind";
 
@@ -84,7 +84,7 @@
         dest: /etc/rsyslog.d/10-server.conf
         mode: '0644'
         content: |
-          # {{ ansible_managed }}
+          # Managed by Ansible - do not edit directly
           module(load="imudp")
           input(type="imudp" port="{{ syslog_port }}")
           module(load="imtcp")

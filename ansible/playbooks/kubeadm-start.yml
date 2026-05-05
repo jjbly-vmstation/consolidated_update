@@ -1,0 +1,152 @@
+---
+# kubeadm-start.yml — get kubeadm join command
+#
+# Usage:
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/kubeadm-start.yml
+
+- name: Get kubeadm join command
+  hosts: control_plane
+  become: true
+  gather_facts: false
+
+  vars:
+    kubeconfig: /etc/kubernetes/admin.conf
+    repo_root: "{{ playbook_dir }}/../.."
+
+  tasks:
+    - name: Rev it up
+      args:
+        creates: /etc/kubernetes/admin.conf
+      ansible.builtin.command:
+        cmd: >-
+          kubeadm init
+          --control-plane-endpoint {{ control_plane_endpoint }}
+          --pod-network-cidr {{ pod_network_cidr }}
+          --service-cidr {{ service_cidr }}      
+      changed_when: true
+    
+    - name: Create .kube directory for jjbly
+      ansible.builtin.file:
+        path: /home/jjbly/.kube
+        state: directory
+        owner: jjbly
+        group: jjbly
+        mode: '0700'
+
+    - name: Set up kubeconfig for jjbly
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/jjbly/.kube/config
+        remote_src: true
+        owner: jjbly
+        group: jjbly
+        mode: '0600'
+
+    - name: Ensure KUBECONFIG is set correctly in .bashrc
+      ansible.builtin.lineinfile:
+        path: /home/jjbly/.bashrc
+        line: 'export KUBECONFIG=/home/jjbly/.kube/config'
+        regexp: '^export KUBECONFIG='
+        owner: jjbly
+        group: jjbly
+
+    - name: Ensure KUBECONFIG is set correctly in /etc/environment
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        line: 'KUBECONFIG=/home/jjbly/.kube/config'
+        regexp: '^KUBECONFIG='
+
+    - name: Apply Calico CNI
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f https://docs.projectcalico.org/manifests/calico.yaml
+        creates: /etc/cni/net.d/10-calico.conflist
+
+    - name: Get kubeadm join command
+      ansible.builtin.command:
+        cmd: kubeadm token create --print-join-command --kubeconfig /etc/kubernetes/admin.conf
+      changed_when: false
+      register: join_command
+      tags: [join]
+
+    - name: Display kubeadm join command
+      ansible.builtin.debug:
+        msg: "{{ join_command.stdout }}"
+      tags: [join]
+
+    - name: Check if worker is already joined
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['workers'] }}"
+      register: worker_joined
+      tags: [join]
+
+    - name: Reset any existing kubeadm state on workers
+      ansible.builtin.command:
+        cmd: kubeadm reset -f
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
+      changed_when: true
+      tags: [join]
+
+    - name: Join workers to cluster
+      ansible.builtin.command:
+        cmd: "{{ join_command.stdout }}"
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
+      changed_when: true
+      tags: [join]
+
+    - name: Fix kubelet.conf server address on workers
+      ansible.builtin.replace:
+        path: /etc/kubernetes/kubelet.conf
+        regexp: 'server: https://localhost:6443'
+        replace: 'server: https://{{ control_plane_endpoint }}'
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
+      tags: [join]
+
+    - name: Restart kubelet on workers
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+      delegate_to: "{{ groups['workers'][idx] }}"
+      loop: "{{ worker_joined.results }}"
+      loop_control:
+        index_var: idx
+      when: not item.stat.exists
+      tags: [join]
+
+    - name: Label workers
+      ansible.builtin.command:
+        cmd: >-
+          kubectl --kubeconfig={{ kubeconfig }} label node
+          {{ item }}.{{ cluster_domain }}
+          node-role.kubernetes.io/worker=storage
+          vmstation/role=storage
+          --overwrite
+      loop: "{{ groups['workers'] }}"
+      changed_when: true
+      tags: [join]
+
+    - name: Show nodes status
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} get nodes
+      changed_when: false
+      register: node_status
+      tags: [status]
+
+    - name: Display nodes status
+      ansible.builtin.debug:
+        msg: "{{ node_status.stdout_lines }}"
+      tags: [status]
+

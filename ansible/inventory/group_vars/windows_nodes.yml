@@ -6,5 +6,5 @@ ansible_winrm_port: 5985
 
 # svc-ansible must exist on the Windows host with appropriate privileges.
 # Password stored in ansible vault: vault_windows_ansible_password
-ansible_user: svc-ansible
+ansible_user: VMSTATION\ansible_svc
 ansible_password: "{{ vault_windows_ansible_password }}"

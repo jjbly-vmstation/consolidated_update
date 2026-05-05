@@ -20,5 +20,3 @@ cni_plugin: calico
 
 ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
 ansible_python_interpreter: /usr/bin/python3
-
-ansible_managed: "Managed by Ansible - do not edit directly"

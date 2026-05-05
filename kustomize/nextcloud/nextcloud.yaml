@@ -22,6 +22,8 @@ spec:
         app.kubernetes.io/name: nextcloud
         app.kubernetes.io/component: app
     spec:
+      nodeSelector:
+        vmstation/role: storage
       initContainers:
         - name: prep-data-dir
           image: alpine:3.19

@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+  labels:
+    app: vaultwarden
+    app.kubernetes.io/name: vaultwarden
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vaultwarden
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vaultwarden
+        app.kubernetes.io/name: vaultwarden
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vaultwarden
+          image: vaultwarden/server:latest
+          env:
+            - name: DOMAIN
+              value: "https://vault.lan"
+            - name: WEBSOCKET_ENABLED
+              value: "true"
+            - name: SIGNUPS_ALLOWED
+              value: "true"
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vaultwarden-admin-token
+                  key: token
+            - name: LOG_LEVEL
+              value: warn
+          ports:
+            - containerPort: 80
+              name: http
+            - containerPort: 3012
+              name: websocket
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vaultwarden-pvc
