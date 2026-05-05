@@ -157,6 +157,13 @@
           -passin pass:"{{ pfx_password }}"
       changed_when: true
 
+    - name: Ensure namespaces exist
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create namespace {{ item }} --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      loop: "{{ cert_namespaces }}"
+      changed_when: false
+
     - name: Install TLS secret in each namespace
       ansible.builtin.shell: |
         kubectl --kubeconfig={{ kubeconfig }} \
