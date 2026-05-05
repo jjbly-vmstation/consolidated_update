@@ -19,6 +19,30 @@
     repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
+    - name: Create local PV directories on masternode
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /var/lib/vaultwarden
+        - /srv/monitoring_data/prometheus
+        - /srv/monitoring_data/grafana
+        - /srv/monitoring_data/loki
+      tags: [always]
+
+    - name: Create local PV directories on storagenodet3500
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /srv/media/nextcloud
+        - /srv/media/jellyfin-config
+        - /var/lib/k8s/mariadb
+      delegate_to: storagenodet3500
+      tags: [always]
+
     - name: Apply nginx ingress controller
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/ingress
