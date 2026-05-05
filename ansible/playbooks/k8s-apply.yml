@@ -5,9 +5,14 @@
 #
 # Usage:
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
+#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags cert-manager
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags ingress
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags jellyfin
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
+#
+# First-time setup order:
+#   1. ansible-playbook k8s-certs.yml   (DNS + Cloudflare secret)
+#   2. ansible-playbook k8s-apply.yml   (installs cert-manager, then all apps)
 
 - name: Apply Kubernetes manifests via Kustomize
   hosts: control_plane
@@ -37,11 +42,44 @@
         state: directory
         mode: "0755"
       loop:
-        - /srv/media/nextcloud
-        - /srv/media/jellyfin-config
+        - /var/lib/jellyfin/config
+        - /var/lib/jellyfin/cache
+        - /var/lib/k8s/nextcloud
         - /var/lib/k8s/mariadb
       delegate_to: storagenodet3500
+      ignore_unreachable: true
       tags: [always]
+
+    - name: Install cert-manager from official release
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} apply -f \
+          https://github.com/cert-manager/cert-manager/releases/download/v1.16.3/cert-manager.yaml
+      changed_when: true
+      tags: [cert-manager]
+
+    - name: Wait for cert-manager webhook to be ready
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} wait \
+          --for=condition=Available deployment/cert-manager-webhook \
+          -n cert-manager --timeout=120s
+      changed_when: false
+      tags: [cert-manager]
+
+    - name: Pin cert-manager deployments to masternode
+      ansible.builtin.shell: |
+        for deploy in cert-manager cert-manager-cainjector cert-manager-webhook; do
+          kubectl --kubeconfig={{ kubeconfig }} patch deployment $deploy -n cert-manager \
+            --type=strategic \
+            -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/control-plane":""},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+        done
+      changed_when: true
+      tags: [cert-manager]
+
+    - name: Apply ClusterIssuer (Let's Encrypt + Cloudflare)
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/cert-manager
+      changed_when: true
+      tags: [cert-manager]
 
     - name: Apply nginx ingress controller
       ansible.builtin.command:
@@ -72,6 +110,18 @@
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/vaultwarden
       changed_when: true
       tags: [vaultwarden]
+
+    - name: Apply Homer dashboard
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/homer
+      changed_when: true
+      tags: [homer]
+
+    - name: Apply nodectl (WoL + shutdown API)
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/nodectl
+      changed_when: true
+      tags: [nodectl]
 
     - name: Show pod status
       ansible.builtin.command:

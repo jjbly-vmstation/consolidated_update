@@ -110,8 +110,8 @@ spec:
           persistentVolumeClaim:
             claimName: jellyfin-config-pvc
         - name: jellyfin-cache
-          emptyDir:
-            sizeLimit: 10Gi
+          persistentVolumeClaim:
+            claimName: jellyfin-cache-pvc
         - name: jellyfin-media
           hostPath:
             path: /mnt/media

@@ -16,7 +16,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   local:
-    path: /srv/media/nextcloud
+    path: /var/lib/k8s/nextcloud
   nodeAffinity:
     required:
       nodeSelectorTerms:

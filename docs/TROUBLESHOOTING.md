@@ -1,60 +1,38 @@
 # Troubleshooting — VMStation Homelab
 
-Issues hit during initial cluster bring-up and how they were resolved.
-
 ---
 
-## AD CS certificate request failures
+## TLS / Certificate issues
 
-### CERTSRV_E_NO_CERT_TYPE (0x80094801)
+### ERR_CERT_AUTHORITY_INVALID or cert warnings after fresh deploy
 
-**Symptom:** `certreq -submit` denied with "The request contains no certificate template information."
+cert-manager takes 30–90 seconds to issue a new certificate after an ingress
+is first created. During that time nginx serves a self-signed fallback cert.
 
-**Cause:** The AD CA policy module requires every CSR to name a certificate template. The original INF had no `[RequestAttributes]` section.
-
-**Fix:** Added to the INF:
-```ini
-[RequestAttributes]
-CertificateTemplate = WebServer
+Check cert status:
+```bash
+kubectl get certificate -A
+kubectl describe certificate <name> -n <namespace>
+kubectl describe challenge -n <namespace>   # if still pending
 ```
 
-Configurable via the `cert_template` variable in `k8s-certs.yml`. To list templates available on your CA:
+If a cert is stuck `pending` for more than 5 minutes, the most common causes:
+- Cloudflare API token secret missing from `cert-manager` namespace
+- Token doesn't have DNS:Edit permission for `jjbly.uk`
+- DNS-01 challenge TXT record didn't propagate before Let's Encrypt checked
+
+Re-create the Cloudflare secret:
+```bash
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml --ask-vault-pass
+```
+
+### Service still resolving to old .lan address
+
+The old `lan` DNS zone on the Windows DC may still exist. Remove it:
 ```powershell
-certutil -CATemplates
+Remove-DnsServerZone -Name "lan" -Force
 ```
-
----
-
-### User context template conflicts with machine context (0x8004e00c)
-
-**Symptom:** `certreq -new` failed with "User context template conflicts with machine context."
-
-**Cause:** `WebServer` is a machine-scoped template but the INF had `MachineKeySet = FALSE`.
-
-**Fix:** Set `MachineKeySet = TRUE` in `[NewRequest]` and updated the PFX export to look in `Cert:\LocalMachine\My` instead of `Cert:\CurrentUser\My`.
-
----
-
-### CERTSRV_E_TEMPLATE_DENIED (0x80094012)
-
-**Symptom:** `certreq -submit` denied with "The permissions on the certificate template do not allow the current user to enroll."
-
-**Cause:** The ansible service account had no Enroll permission on the WebServer template.
-
-**Fix:** On the DC as Domain Admin:
-1. `mmc certtmpl.msc` → right-click **Web Server** → **Properties** → **Security**
-2. Add the ansible service account, grant **Read** + **Enroll**
-3. Re-publish if needed: `certutil -SetCAtemplates +WebServer`
-
----
-
-### ERROR_FILE_EXISTS on wildcard.rsp (0x80070050)
-
-**Symptom:** `certreq -submit` failed with "The file exists" on `wildcard.rsp`.
-
-**Cause:** `certreq -submit` writes a `.rsp` response file and refuses to overwrite it. The stale-file cleanup task didn't include `wildcard.rsp`.
-
-**Fix:** Added `wildcard.rsp` to the cleanup loop in `k8s-certs.yml`.
+Or re-run `k8s-certs.yml` which removes it automatically.
 
 ---
 
@@ -62,46 +40,45 @@ certutil -CATemplates
 
 ### CreateContainerConfigError — missing Secret
 
-**Symptom:** Nextcloud and MariaDB pods stuck in `CreateContainerConfigError`. No useful output from `kubectl logs`.
+**Symptom:** Nextcloud or MariaDB pods stuck in `CreateContainerConfigError`.
 
-**Cause:** Pods reference a Secret (`nextcloud-secrets`) that doesn't exist in the namespace. Kubernetes can't start the container when a required Secret is missing.
+**Cause:** The `nextcloud-secrets` Secret doesn't exist in the namespace.
 
-**Fix:** Create the secret before running `k8s-apply.yml`:
+**Fix:**
 ```bash
 kubectl create secret generic nextcloud-secrets \
   --from-literal=db-name=nextcloud \
   --from-literal=db-user=nextcloud \
-  --from-literal=db-password=CHANGEME \
-  --from-literal=mariadb-root-password=CHANGEME \
+  --from-literal=db-password=<DB_PASSWORD> \
+  --from-literal=mariadb-root-password=<ROOT_PASSWORD> \
   --from-literal=admin-user=admin \
-  --from-literal=admin-password=CHANGEME \
-  --from-literal=trusted-domains=nextcloud.lan \
+  --from-literal=admin-password=<ADMIN_PASSWORD> \
+  --from-literal=trusted-domains="nextcloud.jjbly.uk" \
   --from-literal=overwriteprotocol=https \
-  --from-literal=overwritehost=nextcloud.lan \
-  --from-literal=overwritecliurl=https://nextcloud.lan \
+  --from-literal=overwritehost=nextcloud.jjbly.uk \
+  --from-literal=overwritecliurl=https://nextcloud.jjbly.uk \
   -n nextcloud
 ```
 
-Same issue for Vaultwarden:
+For Vaultwarden:
 ```bash
 kubectl create secret generic vaultwarden-admin-token \
   --from-literal=token=$(openssl rand -base64 32) \
   -n vaultwarden
 ```
 
----
+### ContainerCreating — MountVolume failed / path does not exist
 
-### ContainerCreating / MountVolume failed — missing host directories
+**Symptom:** Pod stuck in `ContainerCreating`. `kubectl describe pod` shows path does not exist.
 
-**Symptom:** Pods stuck in `ContainerCreating`. `kubectl describe pod` shows:
+**Cause:** Local PersistentVolumes require the host directory to exist before the pod starts.
+
+**Fix:** Run the apply playbook — it creates all directories automatically:
+```bash
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
 ```
-MountVolume.NewMounter initialization failed for volume "vaultwarden-pv":
-path "/var/lib/vaultwarden" does not exist
-```
 
-**Cause:** Local PersistentVolumes bind to host paths that must exist before the kubelet can mount them. The directories were not created anywhere in the automation.
-
-**Affected paths:**
+Current paths (all on root filesystem, not on /srv/media):
 
 | Node | Path |
 |---|---|
@@ -109,18 +86,81 @@ path "/var/lib/vaultwarden" does not exist
 | masternode | `/srv/monitoring_data/prometheus` |
 | masternode | `/srv/monitoring_data/grafana` |
 | masternode | `/srv/monitoring_data/loki` |
-| storagenodet3500 | `/srv/media/nextcloud` |
-| storagenodet3500 | `/srv/media/jellyfin-config` |
+| storagenodet3500 | `/var/lib/jellyfin/config` |
+| storagenodet3500 | `/var/lib/jellyfin/cache` |
+| storagenodet3500 | `/var/lib/k8s/nextcloud` |
 | storagenodet3500 | `/var/lib/k8s/mariadb` |
 
-**Fix:** Added directory creation tasks to `k8s-apply.yml` so they are created automatically before manifests are applied.
+**Rule:** `/srv/media` on storagenodet3500 is for media files only.
+All application config, cache, and databases go under `/var/lib`.
+
+### PersistentVolume spec is immutable
+
+**Symptom:** `kubectl apply` fails with `spec.persistentvolumesource is immutable after creation`.
+
+**Cause:** Kubernetes does not allow changing a PV's path after creation.
+
+**Fix:** Scale down the workload, delete the PVC and PV, then re-apply:
+```bash
+kubectl scale deployment <name> -n <namespace> --replicas=0
+kubectl delete pvc <name> -n <namespace>
+kubectl delete pv <name>
+kubectl apply -k kustomize/<app>/
+kubectl scale deployment <name> -n <namespace> --replicas=1
+```
 
 ---
 
-### Namespace not found during TLS secret install
+## Jellyfin
 
-**Symptom:** `k8s-certs.yml` failed installing the wildcard TLS secret into the `vaultwarden` namespace with `namespaces "vaultwarden" not found`.
+### Can't log in / forgot password
 
-**Cause:** The cert playbook ran before `k8s-apply.yml` had created the namespace.
+Jellyfin stores users in a SQLite database at `/config/data/jellyfin.db` on the
+config PVC (`/var/lib/jellyfin/config` on storagenodet3500).
 
-**Fix:** Added an idempotent namespace-creation task to `k8s-certs.yml` that runs before the secret install loop.
+Reset via Python (no sqlite3 binary needed):
+```bash
+kubectl cp jellyfin/<pod>:/config/data/jellyfin.db /tmp/jellyfin.db
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('/tmp/jellyfin.db')
+conn.execute(\"UPDATE Users SET Password = NULL, MustUpdatePassword = 1 WHERE Username = 'root';\")
+conn.commit(); conn.close(); print('done')
+"
+kubectl cp /tmp/jellyfin.db jellyfin/<pod>:/config/data/jellyfin.db
+kubectl rollout restart deployment/jellyfin -n jellyfin
+```
+Log in as `root` with no password, then set a new one immediately.
+
+### Artwork missing / blue backgrounds after pod restart
+
+Jellyfin's image cache is at `/cache` (PVC at `/var/lib/jellyfin/cache`).
+If it was recently migrated from an emptyDir it may be empty. Trigger a rescan:
+
+Dashboard → Libraries → Scan All Libraries
+
+### Plugins not appearing in Catalog
+
+Jellyfin 10.10 removed the Repositories UI tab. Either:
+- Use the Catalog tab (works with the default repo URL)
+- Install manually by placing plugin DLLs in `/var/lib/jellyfin/config/plugins/<name>/`
+  on storagenodet3500, then `kubectl rollout restart deployment/jellyfin -n jellyfin`
+
+Intro Skipper is **built into Jellyfin 10.10** — enable it at Dashboard → Playback.
+
+---
+
+## Prometheus / Grafana
+
+### Node count shows more nodes than exist
+
+Caused by stale or duplicate scrape targets in `prometheus-config` ConfigMap.
+The cluster has exactly 2 nodes: `masternode` (192.168.4.63) and
+`storagenodet3500` (192.168.4.61). The Windows DC (192.168.4.62) runs no
+Linux exporters and must not appear as a node-exporter target.
+
+After fixing the ConfigMap, apply and restart:
+```bash
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
+kubectl rollout restart deployment/prometheus -n monitoring
+```

@@ -4,15 +4,13 @@ Step-by-step first-time cluster setup.
 
 ## Prerequisites
 
-- masternode (192.168.4.63, Debian) is reachable via SSH
-- storagenodet3500 (192.168.4.61, Debian) is reachable via SSH
-- homelab (192.168.4.62) has Windows Server 2025 installed and WinRM enabled
-- AD DC (`vmstation.local`) is running on homelab
-- This repo is cloned on masternode
+- masternode (192.168.4.63, Debian) reachable via SSH
+- storagenodet3500 (192.168.4.61, Debian) reachable via SSH
+- homelab (192.168.4.62) has Windows Server 2025 + AD DC (`vmstation.local`) running
+- Cloudflare API token created with DNS:Edit on `jjbly.uk` (see WINDOWS_DC.md)
+- This repo cloned on masternode at `/opt/vmstation-org/consolidated_update`
 
 ## 1. Install local dependencies
-
-On masternode:
 
 ```bash
 ./bootstrap/install-dependencies.sh
@@ -26,8 +24,8 @@ Installs: ansible, python3, pip, curl, wget, jq, sshpass, git.
 ./bootstrap/setup-ssh-keys.sh
 ```
 
-Generates `~/.ssh/vmstation_cluster` ed25519 key pair and distributes it to
-`storagenodet3500`. masternode uses `ansible_connection: local` and needs no key.
+Generates `~/.ssh/vmstation_cluster` ed25519 key and distributes to storagenodet3500.
+masternode uses `ansible_connection: local` — no key needed.
 
 ## 3. Verify prerequisites
 
@@ -35,22 +33,20 @@ Generates `~/.ssh/vmstation_cluster` ed25519 key pair and distributes it to
 ./bootstrap/verify-prerequisites.sh
 ```
 
-Checks local tools, inventory YAML validity, SSH connectivity, and remote host
-resources (RAM, CPU, disk). Report written to `/tmp/vmstation-prereq-report.txt`.
+Checks tools, inventory YAML, SSH connectivity, and remote host resources.
 
-## 4. Run bootstrap playbook (Linux nodes)
+## 4. Bootstrap Linux nodes
 
 ```bash
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/bootstrap.yml
 ```
 
-Configures on masternode and storagenodet3500:
-- chrony NTP (pointing to AD DC at 192.168.4.62)
+Configures both Linux nodes:
+- chrony NTP → AD DC at 192.168.4.62
 - swap disabled
-- kernel params for Kubernetes (br_netfilter, ip_forward, etc.)
+- kernel params for Kubernetes
 - containerd + SystemdCgroup
-- kubelet / kubeadm / kubectl (held at v1.29)
-- Wake-on-LAN enabled
+- kubelet / kubeadm / kubectl
 
 ## 5. Configure masternode services
 
@@ -58,31 +54,25 @@ Configures on masternode and storagenodet3500:
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/masternode.yml
 ```
 
-Deploys on masternode:
-- BIND9 secondary DNS (forwards to AD DC)
-- rsyslog syslog receiver (UDP/TCP 514)
-- node_exporter
+Deploys on masternode: BIND9 DNS, rsyslog receiver, node_exporter.
 
-## 6. Apply Kubernetes manifests
+## 6. Set up TLS and internal DNS
 
-Assumes cluster is already initialized (kubeadm or Kubespray). Run:
-
+Store the Cloudflare API token in Ansible vault:
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
+ansible-vault edit ansible/inventory/secrets.yml
+# Add: vault_cloudflare_api_token: "<your-token>"
 ```
 
-Or apply individual stacks:
-
+Run the cert playbook — creates `jjbly.uk` DNS zone on the Windows DC,
+removes the old `lan` zone, and creates the Cloudflare secret in Kubernetes:
 ```bash
-kubectl apply -k kustomize/monitoring/
-kubectl apply -k kustomize/jellyfin/
-kubectl apply -k kustomize/nextcloud/
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml --ask-vault-pass
 ```
 
-## 7. Create Nextcloud secrets
+## 7. Create application secrets
 
-Before applying Nextcloud, create the required secret:
-
+**Nextcloud** (update passwords before running):
 ```bash
 kubectl create secret generic nextcloud-secrets \
   --from-literal=db-name=nextcloud \
@@ -91,18 +81,50 @@ kubectl create secret generic nextcloud-secrets \
   --from-literal=mariadb-root-password=<ROOT_PASSWORD> \
   --from-literal=admin-user=admin \
   --from-literal=admin-password=<ADMIN_PASSWORD> \
-  --from-literal=trusted-domains="192.168.4.63 nextcloud.lan" \
-  --from-literal=overwriteprotocol=http \
-  --from-literal=overwritehost="192.168.4.63:30080" \
-  --from-literal=overwritecliurl="http://192.168.4.63:30080" \
-  -n nextcloud
+  --from-literal=trusted-domains="nextcloud.jjbly.uk" \
+  --from-literal=overwriteprotocol=https \
+  --from-literal=overwritehost=nextcloud.jjbly.uk \
+  --from-literal=overwritecliurl=https://nextcloud.jjbly.uk \
+  -n nextcloud --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-## 8. Validate
+**Vaultwarden**:
+```bash
+kubectl create secret generic vaultwarden-admin-token \
+  --from-literal=token=$(openssl rand -base64 32) \
+  -n vaultwarden --dry-run=client -o yaml | kubectl apply -f -
+```
+
+## 8. Apply Kubernetes manifests
+
+```bash
+ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
+```
+
+This installs (in order):
+1. cert-manager (Let's Encrypt controller)
+2. ClusterIssuer (Cloudflare DNS-01)
+3. nginx ingress controller
+4. All app stacks (monitoring, Jellyfin, Nextcloud, Vaultwarden, Homer)
+
+cert-manager automatically issues Let's Encrypt certs for each service.
+No certificate installation needed on any client device.
+
+## 9. Validate
 
 ```bash
 kubectl get nodes
 kubectl get pods -A
+kubectl get certificate -A   # all should show READY=True within ~2 minutes
 ```
 
-Expected: all nodes Ready, all pods Running.
+## Service URLs (internal DNS via jjbly.uk zone on Windows DC)
+
+| Service | URL |
+|---------|-----|
+| Dashboard | https://home.jjbly.uk |
+| Jellyfin | https://jellyfin.jjbly.uk |
+| Nextcloud | https://nextcloud.jjbly.uk |
+| Vaultwarden | https://vault.jjbly.uk |
+| Grafana | https://grafana.jjbly.uk |
+| Prometheus | https://prometheus.jjbly.uk |

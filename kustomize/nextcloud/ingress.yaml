@@ -1,4 +1,3 @@
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -7,6 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: nextcloud
   annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
@@ -16,10 +16,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - nextcloud.lan
-      secretName: vmstation-wildcard-tls
+        - nextcloud.jjbly.uk
+      secretName: nextcloud-jjbly-uk-tls
   rules:
-    - host: nextcloud.lan
+    - host: nextcloud.jjbly.uk
       http:
         paths:
           - path: /
