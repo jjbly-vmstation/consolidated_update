@@ -67,3 +67,6 @@ data:
 
   docker.yaml: |
     {}
+
+  kubernetes.yaml: |
+    mode: disabled
