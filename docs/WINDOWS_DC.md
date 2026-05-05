@@ -40,13 +40,27 @@ forwarding secondary — all LAN queries go to 192.168.4.62 first.
 
 DNS records to create on AD DC:
 
-| Name | Type | Value |
-|------|------|-------|
-| masternode | A | 192.168.4.63 |
-| storagenodet3500 | A | 192.168.4.61 |
-| jellyfin.lan | A | 192.168.4.61 |
-| nextcloud.lan | A | 192.168.4.63 |
-| grafana.lan | A | 192.168.4.63 |
+| Name | Type | Value | Note |
+|------|------|-------|------|
+| masternode | A | 192.168.4.63 | vmstation.local zone |
+| storagenodet3500 | A | 192.168.4.61 | vmstation.local zone |
+| jellyfin | A | 192.168.4.63 | lan zone — ingress controller |
+| nextcloud | A | 192.168.4.63 | lan zone — ingress controller |
+| vault | A | 192.168.4.63 | lan zone — ingress controller |
+| grafana | A | 192.168.4.63 | lan zone — ingress controller |
+| prometheus | A | 192.168.4.63 | lan zone — ingress controller |
+
+All `*.lan` names point to masternode (192.168.4.63) where nginx ingress runs.
+The ingress controller routes to the correct backend pod based on the Host header.
+
+Create the lan zone and records:
+```powershell
+Add-DnsServerPrimaryZone -Name "lan" -ZoneFile "lan.dns" -DynamicUpdate None
+$ip = "192.168.4.63"
+foreach ($name in @("jellyfin","nextcloud","vault","grafana","prometheus")) {
+    Add-DnsServerResourceRecordA -ZoneName "lan" -Name $name -IPv4Address $ip -TimeToLive 01:00:00
+}
+```
 
 ## Hyper-V VM subnet
 
