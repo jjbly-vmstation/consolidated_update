@@ -116,6 +116,37 @@
         dest: /tmp/vmstation-wildcard.pfx
         flat: true
 
+    - name: Export AD CA root certificate
+      ansible.windows.win_shell: |
+        $ca = Get-ChildItem Cert:\LocalMachine\Root |
+          Where-Object { $_.Subject -match "wsdc-homelab-CA" } |
+          Sort-Object NotAfter -Descending |
+          Select-Object -First 1
+        if (-not $ca) {
+          # Fall back: find any CA cert that issued our domain cert
+          $ca = Get-ChildItem Cert:\LocalMachine\Root |
+            Where-Object { $_.Subject -match "vmstation" } |
+            Sort-Object NotAfter -Descending |
+            Select-Object -First 1
+        }
+        if (-not $ca) { Write-Error "Root CA cert not found in LocalMachine\Root store"; exit 1 }
+        Export-Certificate -Cert $ca -FilePath "{{ temp_dir }}\vmstation-root-ca.cer" -Type CERT -Force | Out-Null
+        Write-Output $ca.Subject
+      register: ca_export
+      changed_when: true
+
+    - name: Fetch CA root cert to controller
+      ansible.builtin.fetch:
+        src: '{{ temp_dir }}\vmstation-root-ca.cer'
+        dest: /tmp/vmstation-root-ca.cer
+        flat: true
+
+    - name: Convert CA cert to PEM for Linux/Android distribution
+      ansible.builtin.shell: |
+        openssl x509 -inform DER -in /tmp/vmstation-root-ca.cer \
+          -out /tmp/vmstation-root-ca.crt
+      delegate_to: localhost
+
     - name: Remove temp files from DC
       ansible.windows.win_file:
         path: "{{ temp_dir }}"
@@ -189,3 +220,27 @@
         - "{{ pfx_path }}"
         - /tmp/vmstation-tls.crt
         - /tmp/vmstation-tls.key
+
+- name: Trust AD CA root cert on Linux nodes and expose for device enrollment
+  hosts: linux_nodes
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Copy CA root cert to system trust store
+      ansible.builtin.copy:
+        src: /tmp/vmstation-root-ca.crt
+        dest: /usr/local/share/ca-certificates/vmstation-root-ca.crt
+        mode: '0644'
+
+    - name: Update CA trust
+      ansible.builtin.command: update-ca-certificates
+      changed_when: true
+
+    - name: Expose CA cert via nginx for device enrollment
+      # Browse to http://<any-node-ip>/vmstation-root-ca.crt on your phone to install
+      ansible.builtin.copy:
+        src: /tmp/vmstation-root-ca.crt
+        dest: /var/www/html/vmstation-root-ca.crt
+        mode: '0644'
+      ignore_errors: true   # skip silently if nginx is not installed on this node
