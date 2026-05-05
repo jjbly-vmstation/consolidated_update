@@ -99,6 +99,12 @@
       changed_when: true
       tags: [vaultwarden]
 
+    - name: Apply Homer dashboard
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/homer
+      changed_when: true
+      tags: [homer]
+
     - name: Show pod status
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} get pods -A

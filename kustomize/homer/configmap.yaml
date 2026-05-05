@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homer-config
+  namespace: homer
+data:
+  config.yml: |
+    title: "jjbly homelab"
+    subtitle: "Home Network"
+    logo: "logo.png"
+
+    header: true
+    footer: false
+
+    colors:
+      light:
+        highlight-primary: "#3367d6"
+        highlight-secondary: "#4285f4"
+        highlight-hover: "#5a95f5"
+        background: "#f2f2f2"
+        card-background: "#ffffff"
+        text: "#363636"
+        text-header: "#ffffff"
+        text-title: "#303030"
+        text-subtitle: "#424242"
+        card-shadow: rgba(0, 0, 0, 0.1)
+        link: "#3273dc"
+        link-hover: "#363636"
+
+    services:
+      - name: "Media"
+        icon: "fas fa-photo-video"
+        items:
+          - name: "Jellyfin"
+            logo: "https://jellyfin.org/images/favicon.ico"
+            subtitle: "Movies, TV & Music"
+            url: "https://jellyfin.jjbly.uk"
+            target: "_blank"
+
+      - name: "Productivity"
+        icon: "fas fa-cloud"
+        items:
+          - name: "Nextcloud"
+            logo: "https://nextcloud.com/wp-content/themes/next/assets/img/favicon.png"
+            subtitle: "Files & Sync"
+            url: "https://nextcloud.jjbly.uk"
+            target: "_blank"
+          - name: "Vaultwarden"
+            logo: "https://bitwarden.com/images/icons/favicon/favicon-32x32.png"
+            subtitle: "Password Manager"
+            url: "https://vault.jjbly.uk"
+            target: "_blank"
+
+      - name: "Monitoring"
+        icon: "fas fa-chart-line"
+        items:
+          - name: "Grafana"
+            logo: "https://grafana.com/static/assets/img/fav32.png"
+            subtitle: "Dashboards & Alerts"
+            url: "https://grafana.jjbly.uk"
+            target: "_blank"
+          - name: "Prometheus"
+            logo: "https://prometheus.io/assets/favicons/favicon.ico"
+            subtitle: "Metrics"
+            url: "https://prometheus.jjbly.uk"
+            target: "_blank"
