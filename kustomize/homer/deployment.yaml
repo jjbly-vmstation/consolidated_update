@@ -29,7 +29,7 @@ spec:
               name: http
           env:
             - name: HOMEPAGE_ALLOWED_HOSTS
-              value: "home.jjbly.uk"
+              value: "*"
           volumeMounts:
             - name: config
               mountPath: /app/config/settings.yaml
@@ -54,14 +54,12 @@ spec:
               cpu: 200m
               memory: 256Mi
           readinessProbe:
-            httpGet:
-              path: /api/healthcheck
+            tcpSocket:
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /api/healthcheck
+            tcpSocket:
               port: 3000
             initialDelaySeconds: 15
             periodSeconds: 30
