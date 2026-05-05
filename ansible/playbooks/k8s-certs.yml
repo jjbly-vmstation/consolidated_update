@@ -53,6 +53,11 @@
           2.5.29.17 = "{text}"
           _continue_ = "dns=*.lan&"
           _continue_ = "dns=lan&"
+          _continue_ = "dns=vault.lan&"
+          _continue_ = "dns=jellyfin.lan&"
+          _continue_ = "dns=nextcloud.lan&"
+          _continue_ = "dns=grafana.lan&"
+          _continue_ = "dns=prometheus.lan&"
 
           [RequestAttributes]
           CertificateTemplate = {{ cert_template }}
