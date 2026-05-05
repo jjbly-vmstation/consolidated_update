@@ -65,6 +65,16 @@
       changed_when: false
       tags: [cert-manager]
 
+    - name: Pin cert-manager deployments to masternode
+      ansible.builtin.shell: |
+        for deploy in cert-manager cert-manager-cainjector cert-manager-webhook; do
+          kubectl --kubeconfig={{ kubeconfig }} patch deployment $deploy -n cert-manager \
+            --type=strategic \
+            -p '{"spec":{"template":{"spec":{"nodeSelector":{"node-role.kubernetes.io/control-plane":""},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+        done
+      changed_when: true
+      tags: [cert-manager]
+
     - name: Apply ClusterIssuer (Let's Encrypt + Cloudflare)
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/cert-manager
