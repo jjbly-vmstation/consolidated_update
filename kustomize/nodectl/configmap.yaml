@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nodectl-script
+  namespace: nodectl
+data:
+  server.py: |
+    #!/usr/bin/env python3
+    import json, socket, subprocess
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+
+    STORAGE_MAC  = "b8:ac:6f:7e:6c:9d"
+    STORAGE_IP   = "192.168.4.61"
+    STORAGE_USER = "jjbly"
+    SSH_KEY      = "/ssh/id_ed25519"
+
+    def send_wol():
+        mac = bytes.fromhex(STORAGE_MAC.replace(":", ""))
+        packet = b"\xff" * 6 + mac * 16
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.sendto(packet, ("255.255.255.255", 9))
+
+    def reply(h, code, body):
+        data = json.dumps(body).encode()
+        h.send_response(code)
+        h.send_header("Content-Type", "application/json")
+        h.send_header("Access-Control-Allow-Origin", "*")
+        h.send_header("Content-Length", str(len(data)))
+        h.end_headers()
+        h.wfile.write(data)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/status":
+                up = subprocess.run(
+                    ["ping", "-c1", "-W1", STORAGE_IP], capture_output=True
+                ).returncode == 0
+                reply(self, 200, {"up": up, "text": "Online" if up else "Offline"})
+
+            elif self.path == "/wol":
+                try:
+                    send_wol()
+                    reply(self, 200, {"status": "WoL packet sent to " + STORAGE_MAC})
+                except Exception as e:
+                    reply(self, 500, {"error": str(e)})
+
+            elif self.path == "/shutdown":
+                up = subprocess.run(
+                    ["ping", "-c1", "-W1", STORAGE_IP], capture_output=True
+                ).returncode == 0
+                if not up:
+                    reply(self, 409, {"error": "Node is already offline"})
+                    return
+                try:
+                    subprocess.Popen([
+                        "ssh", "-i", SSH_KEY,
+                        "-o", "StrictHostKeyChecking=no",
+                        "-o", "ConnectTimeout=5",
+                        f"{STORAGE_USER}@{STORAGE_IP}",
+                        "sudo shutdown -h now"
+                    ])
+                    reply(self, 200, {"status": "Shutdown command sent"})
+                except Exception as e:
+                    reply(self, 500, {"error": str(e)})
+
+            else:
+                reply(self, 404, {"error": "not found"})
+
+        def log_message(self, *args):
+            pass
+
+    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()

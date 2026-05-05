@@ -32,6 +32,7 @@
       - grafana
       - prometheus
       - home
+      - nodectl
 
   tasks:
     - name: Create jjbly.uk primary DNS zone on AD DC (idempotent)
@@ -93,3 +94,18 @@
         kubectl --kubeconfig={{ kubeconfig }} apply -f -
       changed_when: true
       no_log: true
+
+    - name: Ensure nodectl namespace exists
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create namespace nodectl --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: false
+
+    - name: Create nodectl SSH key secret
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig }} create secret generic nodectl-ssh-key \
+          --from-file=id_ed25519=/home/jjbly/.ssh/id_ed25519 \
+          -n nodectl \
+          --dry-run=client -o yaml | \
+        kubectl --kubeconfig={{ kubeconfig }} apply -f -
+      changed_when: true

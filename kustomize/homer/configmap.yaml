@@ -23,6 +23,10 @@ data:
         icon: mdi-chart-line
         style: row
         columns: 4
+      Infrastructure:
+        icon: mdi-server-network
+        style: row
+        columns: 4
 
   services.yaml: |
     - Media:
@@ -50,6 +54,30 @@ data:
             href: https://prometheus.jjbly.uk
             description: Metrics
             icon: prometheus.png
+
+    - Infrastructure:
+        - storagenodet3500:
+            href: "#"
+            description: NAS / Storage Node
+            icon: mdi-harddisk
+            widget:
+              type: customapi
+              url: http://nodectl.nodectl.svc.cluster.local:8080/status
+              refreshInterval: 15000
+              mappings:
+                - field: text
+                  label: Status
+                  format: text
+        - Wake Storage:
+            href: https://nodectl.jjbly.uk/wol
+            description: Power on storagenodet3500
+            icon: mdi-power
+            target: _blank
+        - Sleep Storage:
+            href: https://nodectl.jjbly.uk/shutdown
+            description: Shutdown storagenodet3500
+            icon: mdi-sleep
+            target: _blank
 
   widgets.yaml: |
     - resources:

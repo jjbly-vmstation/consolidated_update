@@ -106,6 +106,12 @@
       changed_when: true
       tags: [homer]
 
+    - name: Apply nodectl (WoL + shutdown API)
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/nodectl
+      changed_when: true
+      tags: [nodectl]
+
     - name: Show pod status
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} get pods -A
