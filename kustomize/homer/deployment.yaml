@@ -16,6 +16,12 @@ spec:
       labels:
         app: homepage
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000

@@ -3,3 +3,8 @@ kind: Kustomization
 
 resources:
   - clusterissuer.yaml
+
+patches:
+  - path: patch-node-affinity.yaml
+    target:
+      kind: Deployment
