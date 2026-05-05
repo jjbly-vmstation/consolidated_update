@@ -58,6 +58,17 @@
       register: record_result
       changed_when: "'created' in record_result.stdout"
 
+    - name: Remove old lan DNS zone (services moved to jjbly.uk)
+      ansible.windows.win_shell: |
+        if (Get-DnsServerZone -Name "lan" -ErrorAction SilentlyContinue) {
+            Remove-DnsServerZone -Name "lan" -Force
+            Write-Output "removed"
+        } else {
+            Write-Output "absent"
+        }
+      register: lan_zone_result
+      changed_when: "'removed' in lan_zone_result.stdout"
+
 - name: Install Cloudflare API token secret for cert-manager
   hosts: control_plane
   become: false
