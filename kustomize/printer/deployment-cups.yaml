@@ -4,6 +4,9 @@ metadata:
   name: cups
   namespace: print
 spec:
+  # Recreate ensures port 631 is freed BEFORE the new pod starts
+  strategy:
+    type: Recreate
   replicas: 1
   selector:
     matchLabels:
@@ -49,10 +52,6 @@ spec:
               value: "admin"
             - name: CUPS_ADMIN_PASSWORD
               value: "adminpassword"
-          ports:
-            - containerPort: 631
-              name: ipp
-              protocol: TCP
           volumeMounts:
             - name: cups-config
               mountPath: /etc/cups
