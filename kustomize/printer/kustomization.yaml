@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - pvs-pvcs.yaml
+  - postgres-redis.yaml
   - deployment-samba.yaml
   - deployment-mover.yaml
   - deployment-paperless.yaml

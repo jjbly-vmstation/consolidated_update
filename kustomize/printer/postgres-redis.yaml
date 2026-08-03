@@ -13,6 +13,8 @@ spec:
       labels:
         app: redis
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: redis
           image: redis:7-alpine
@@ -46,6 +48,8 @@ spec:
       labels:
         app: postgres
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: postgres
           image: postgres:15-alpine
