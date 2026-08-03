@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-mover
+  namespace: print
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-mover
+  template:
+    metadata:
+      labels:
+        app: scan-mover
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500
+      containers:
+        - name: mover
+          image: alpine:3.18
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              apk add --no-cache inotify-tools rsync;
+              mkdir -p /share/ScanShare /incoming;
+              rsync -av --ignore-existing /share/ScanShare/ /incoming/;
+              inotifywait -m -e close_write,moved_to /share/ScanShare |
+              while read -r dir events file; do
+                echo "Detected $file, copying..."
+                rsync -av --ignore-existing "$dir$file" /incoming/
+              done
+          volumeMounts:
+            - name: scan-storage
+              mountPath: /share/ScanShare
+            - name: paperless-input
+              mountPath: /incoming
+      volumes:
+        - name: scan-storage
+          persistentVolumeClaim:
+            claimName: pvc-scan-storage
+        - name: paperless-input
+          persistentVolumeClaim:
+            claimName: pvc-paperless-input

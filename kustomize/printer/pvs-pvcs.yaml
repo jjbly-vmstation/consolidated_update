@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-scan-storage
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-node
+  hostPath:
+    path: /srv/scan-storage
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-paperless-input
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-node
+  hostPath:
+    path: /srv/paperless-input
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-paperless-media
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-node
+  hostPath:
+    path: /srv/paperless-media
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - storagenodet3500
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-scan-storage
+  namespace: print
+spec:
+  storageClassName: local-node
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-paperless-input
+  namespace: print
+spec:
+  storageClassName: local-node
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-paperless-media
+  namespace: print
+spec:
+  storageClassName: local-node
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi

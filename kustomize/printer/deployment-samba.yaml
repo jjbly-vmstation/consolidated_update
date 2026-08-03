@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-samba
+  namespace: print
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-samba
+  template:
+    metadata:
+      labels:
+        app: scan-samba
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500
+      containers:
+        - name: samba
+          image: ghcr.io/linuxserver/samba:latest
+          env:
+            - name: TZ
+              value: "UTC"
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: USER
+              value: "scanneruser" # replace with Secret in production
+            - name: PASSWORD
+              value: "scanpass"    # replace with Secret in production
+          ports:
+            - containerPort: 445
+              protocol: TCP
+            - containerPort: 139
+              protocol: TCP
+          volumeMounts:
+            - name: scan-storage
+              mountPath: /share/ScanShare
+      volumes:
+        - name: scan-storage
+          persistentVolumeClaim:
+            claimName: pvc-scan-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scan-samba
+  namespace: print
+spec:
+  selector:
+    app: scan-samba
+  type: ClusterIP
+  ports:
+    - port: 445
+      targetPort: 445
+      protocol: TCP

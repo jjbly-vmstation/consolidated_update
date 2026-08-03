@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless
+  namespace: print
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless
+  template:
+    metadata:
+      labels:
+        app: paperless
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500
+      containers:
+        - name: paperless
+          image: ghcr.io/paperless-ngx/paperless-ngx:latest
+          env:
+            - name: PAPERLESS_DBHOST
+              value: "postgres-service"
+            - name: PAPERLESS_DBNAME
+              value: "paperless"
+            - name: PAPERLESS_DBUSER
+              value: "paperless"
+            - name: PAPERLESS_DBPASS
+              value: "paperlesspassword"
+            - name: PAPERLESS_REDIS
+              value: "redis://redis-service:6379/0"
+            - name: PAPERLESS_CONSUMPTION_DIR
+              value: "/consume"
+            - name: PAPERLESS_MEDIA_ROOT
+              value: "/media"
+          ports:
+            - containerPort: 8000
+              name: http
+          volumeMounts:
+            - name: paperless-input
+              mountPath: /consume
+            - name: paperless-media
+              mountPath: /media
+      volumes:
+        - name: paperless-input
+          persistentVolumeClaim:
+            claimName: pvc-paperless-input
+        - name: paperless-media
+          persistentVolumeClaim:
+            claimName: pvc-paperless-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless-nodeport
+  namespace: print
+spec:
+  selector:
+    app: paperless
+  type: NodePort
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 31000
+      protocol: TCP
