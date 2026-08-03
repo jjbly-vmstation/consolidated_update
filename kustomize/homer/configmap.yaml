@@ -44,6 +44,11 @@ data:
             href: https://vault.jjbly.uk
             description: Password Manager
             icon: vaultwarden.png
+        - Documents (Paperless):
+            href: http://storagenodet3500:31000
+            description: Scanned documents (paperless-ngx)
+            icon: mdi-file-document
+            target: _blank
 
     - Monitoring:
         - Grafana:
