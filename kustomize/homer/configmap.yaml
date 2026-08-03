@@ -31,7 +31,7 @@ data:
   services.yaml: |
     - Media:
         - Jellyfin:
-            href: http://masternode.local:30096
+            href: http://storagenodet3500.local:30096
             description: Movies, TV & Music
             icon: jellyfin.png
 
@@ -48,6 +48,11 @@ data:
             href: http://masternode.local:31000
             description: Scanned documents (paperless-ngx)
             icon: mdi-file-document
+            target: _blank
+        - Web Scanner (Scanservjs):
+            href: http://masternode.local:30808
+            description: Trigger scans directly from browser
+            icon: mdi-scanner
             target: _blank
         - CUPS:
             href: http://masternode.local:30631

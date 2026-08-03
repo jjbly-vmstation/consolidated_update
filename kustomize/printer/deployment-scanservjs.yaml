@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scanservjs
+  namespace: print
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scanservjs
+  template:
+    metadata:
+      labels:
+        app: scanservjs
+    spec:
+      containers:
+        - name: scanservjs
+          image: sbs20/scanservjs:latest
+          ports:
+            - containerPort: 8080
+          env:
+            # Tell SANE where to find your network scanner directly
+            - name: SANED_NET_HOSTS
+              value: "192.168.4.72" 
+          volumeMounts:
+            - name: scan-storage
+              mountPath: /var/scans
+      volumes:
+        - name: scan-storage
+          persistentVolumeClaim:
+            claimName: pvc-scan-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scanservjs
+  namespace: print
+spec:
+  type: NodePort
+  selector:
+    app: scanservjs
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30808

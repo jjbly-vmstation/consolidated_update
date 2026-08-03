@@ -8,4 +8,6 @@ resources:
   - deployment-mover.yaml
   - deployment-paperless.yaml
   - deployment-cups.yaml
+  - avahi-reflector.yaml
+  - deployment-scanservjs.yaml
   - service-samba.yaml

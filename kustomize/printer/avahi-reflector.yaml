@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: avahi-reflector
+  namespace: print
+spec:
+  selector:
+    matchLabels:
+      app: avahi-reflector
+  template:
+    metadata:
+      labels:
+        app: avahi-reflector
+    spec:
+      # Crucial: hostNetwork allows mDNS multicast traffic (224.0.0.251:5353) on your physical LAN
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
+      containers:
+        - name: avahi
+          image: ydkn/avahi:latest
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          env:
+            - name: REFLECTOR_ENABLE_REFLECTOR
+              value: "yes"
