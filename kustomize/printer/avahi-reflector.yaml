@@ -12,7 +12,6 @@ spec:
       labels:
         app: avahi-reflector
     spec:
-      # Crucial: hostNetwork allows mDNS multicast traffic (224.0.0.251:5353) on your physical LAN
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
@@ -27,3 +26,11 @@ spec:
           env:
             - name: REFLECTOR_ENABLE_REFLECTOR
               value: "yes"
+          volumeMounts:
+            - name: airprint-service
+              mountPath: /etc/avahi/services/airprint.service
+              subPath: airprint.service
+      volumes:
+        - name: airprint-service
+          configMap:
+            name: avahi-airprint-config
