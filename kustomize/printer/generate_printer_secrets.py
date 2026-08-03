@@ -36,6 +36,7 @@ DEFAULT_TARGET = "ansible/inventory/secrets.yml"
 # Keys we will ensure exist (top-level keys). You can edit this list if you want
 DESIRED_KEYS = {
     # paperless
+    "paperless_secret_key": None,  # Auto-generate if missing
     "paperless_db_user": "paperless",
     "paperless_db_pass": None,  # generate if missing
     "paperless_db_host": "postgres-service",
@@ -44,11 +45,12 @@ DESIRED_KEYS = {
     # scanner smb creds
     "scanner_user": "scanneruser",
     "scanner_password": None,
-    # cloudflare token (empty by default, generated as a random token placeholder if missing)
+    # cloudflare token
     "vault_cloudflare_api_token": None,
-    # windows ansible vault password (if you want to store it here temporarily)
+    # windows ansible vault password
     "vault_windows_ansible_password": None,
 }
+
 
 
 def random_password(nbytes: int = 18) -> str:
@@ -197,11 +199,12 @@ def main(argv=None):
             print("Applying k8s secrets from existing file (no changes)...")
             # build literals for paperless and scanner
             paperless_literals = {
-                "PAPERLESS_DBUSER": merged.get("paperless_db_user","paperless"),
-                "PAPERLESS_DBPASS": merged.get("paperless_db_pass",""),
-                "PAPERLESS_DBHOST": merged.get("paperless_db_host","postgres-service"),
-                "PAPERLESS_DBNAME": merged.get("paperless_db_name","paperless"),
-                "PAPERLESS_REDIS": merged.get("paperless_redis","redis://redis-service:6379/0"),
+                "PAPERLESS_SECRET_KEY": merged.get("paperless_secret_key", ""),
+                "PAPERLESS_DBUSER": merged.get("paperless_db_user", "paperless"),
+                "PAPERLESS_DBPASS": merged.get("paperless_db_pass", ""),
+                "PAPERLESS_DBHOST": merged.get("paperless_db_host", "postgres-service"),
+                "PAPERLESS_DBNAME": merged.get("paperless_db_name", "paperless"),
+                "PAPERLESS_REDIS": merged.get("paperless_redis", "redis://redis-service:6379/0"),
             }
             scanner_literals = {
                 "USER": merged.get("scanner_user","scanneruser"),

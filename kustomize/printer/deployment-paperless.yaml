@@ -19,6 +19,11 @@ spec:
         - name: paperless
           image: ghcr.io/paperless-ngx/paperless-ngx:latest
           env:
+            - name: PAPERLESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: paperless-secret
+                  key: PAPERLESS_SECRET_KEY
             - name: PAPERLESS_DBHOST
               value: "postgres-service"
             - name: PAPERLESS_DBNAME
