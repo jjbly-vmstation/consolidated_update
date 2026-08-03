@@ -31,32 +31,37 @@ data:
   services.yaml: |
     - Media:
         - Jellyfin:
-            href: https://jellyfin.jjbly.uk
+            href: http://masternode.local:30096
             description: Movies, TV & Music
             icon: jellyfin.png
 
     - Productivity:
         - Nextcloud:
-            href: https://nextcloud.jjbly.uk
+            href: http://masternode.local:30301
             description: Files & Sync
             icon: nextcloud.png
         - Vaultwarden:
-            href: https://vault.jjbly.uk
+            href: http://masternode.local:30302
             description: Password Manager
             icon: vaultwarden.png
         - Documents (Paperless):
-            href: http://storagenodet3500:31000
+            href: http://masternode.local:31000
             description: Scanned documents (paperless-ngx)
             icon: mdi-file-document
+            target: _blank
+        - CUPS:
+            href: http://masternode.local:30631
+            description: Printer management
+            icon: mdi-printer
             target: _blank
 
     - Monitoring:
         - Grafana:
-            href: https://grafana.jjbly.uk
+            href: http://masternode.local:30303
             description: Dashboards & Alerts
             icon: grafana.png
         - Prometheus:
-            href: https://prometheus.jjbly.uk
+            href: http://masternode.local:30090
             description: Metrics
             icon: prometheus.png
 
@@ -74,12 +79,12 @@ data:
                   label: Status
                   format: text
         - Wake Storage:
-            href: https://nodectl.jjbly.uk/wol
+            href: http://masternode.local:30304/wol
             description: Power on storagenodet3500
             icon: mdi-power
             target: _blank
         - Sleep Storage:
-            href: https://nodectl.jjbly.uk/shutdown
+            href: http://masternode.local:30304/shutdown
             description: Shutdown storagenodet3500
             icon: mdi-sleep
             target: _blank
