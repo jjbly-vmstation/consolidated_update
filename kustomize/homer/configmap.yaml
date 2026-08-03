@@ -29,46 +29,32 @@ data:
         columns: 4
 
   services.yaml: |
-    - Media:
-        - Jellyfin:
-            href: http://storagenodet3500.local:30096
-            description: Movies, TV & Music
-            icon: jellyfin.png
-
-    - Productivity:
-        - Nextcloud:
-            href: http://masternode.local:30301
-            description: Files & Sync
-            icon: nextcloud.png
-        - Vaultwarden:
-            href: http://masternode.local:30302
-            description: Password Manager
-            icon: vaultwarden.png
-        - Documents (Paperless):
-            href: http://masternode.local:31000
-            description: Scanned documents (paperless-ngx)
-            icon: mdi-file-document
-            target: _blank
-        - Web Scanner (Scanservjs):
-            href: http://masternode.local:30808
-            description: Trigger scans directly from browser
-            icon: mdi-scanner
-            target: _blank
-        - CUPS:
-            href: http://masternode.local:30631
-            description: Printer management
-            icon: mdi-printer
-            target: _blank
-
-    - Monitoring:
-        - Grafana:
-            href: http://masternode.local:30303
-            description: Dashboards & Alerts
-            icon: grafana.png
-        - Prometheus:
-            href: http://masternode.local:30090
-            description: Metrics
-            icon: prometheus.png
+    - name: "Productivity"
+      icon: "fas fa-briefcase"
+      items:
+        - name: "Nextcloud"
+          url: "http://masternode.local:30301"
+          subtitle: "Files & Sync"
+          icon: "fas fa-cloud"
+        - name: "Vaultwarden"
+          url: "http://masternode.local:30302"
+          subtitle: "Password Manager"
+          icon: "fas fa-key"
+        - name: "Documents (Paperless)"
+          url: "http://masternode.local:31000"
+          subtitle: "Scanned documents (paperless-ngx)"
+          icon: "fas fa-file-alt"
+          target: "_blank"
+        - name: "Web Scanner (Scanservjs)"
+          url: "http://masternode.local:30808"
+          subtitle: "Trigger scans directly from browser"
+          icon: "fas fa-print"
+          target: "_blank"
+        - name: "CUPS"
+          url: "http://masternode.local:30631"
+          subtitle: "Printer management"
+          icon: "fas fa-print"
+          target: "_blank"
 
     - Infrastructure:
         - storagenodet3500:
