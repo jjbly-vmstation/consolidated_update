@@ -14,7 +14,7 @@ spec:
         app: paperless
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: paperless
           image: ghcr.io/paperless-ngx/paperless-ngx:latest

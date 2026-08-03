@@ -14,7 +14,7 @@ spec:
         app: scan-samba
     spec:
       nodeSelector:
-        kubernetes.io/hostname: storagenodet3500
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: samba
           image: ghcr.io/linuxserver/samba:latest
