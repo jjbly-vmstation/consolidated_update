@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cups
+  namespace: print
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cups-avahi
+  template:
+    metadata:
+      labels:
+        app: cups-avahi
+    spec:
+      # hostNetwork is required so Avahi can broadcast mDNS (AirPrint/Bonjour) directly onto your LAN
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
+      containers:
+        - name: cups
+          image: ydkn/cups:latest
+          securityContext:
+            privileged: true
+          env:
+            - name: CUPS_ADMIN_USER
+              value: "admin"
+            - name: CUPS_ADMIN_PASSWORD
+              value: "adminpassword"
+          ports:
+            - containerPort: 631
+              name: ipp
+              protocol: TCP
+          volumeMounts:
+            - name: cups-config
+              mountPath: /etc/cups
+            - name: cups-services
+              mountPath: /etc/avahi/services
+            - name: usb-dev
+              mountPath: /dev/bus/usb
+      volumes:
+        - name: cups-config
+          hostPath:
+            path: /srv/cups/config
+            type: DirectoryOrCreate
+        - name: cups-services
+          hostPath:
+            path: /srv/cups/services
+            type: DirectoryOrCreate
+        - name: usb-dev
+          hostPath:
+            path: /dev/bus/usb
