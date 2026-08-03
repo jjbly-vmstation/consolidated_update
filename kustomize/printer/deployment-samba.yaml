@@ -23,6 +23,13 @@ spec:
             - "scanneruser;scanpass"
             - "-s"
             - "ScanShare;/share/ScanShare;yes;no;no;scanneruser"
+            # Enable SMB1/NT1 support for older Brother hardware
+            - "-g"
+            - "server min protocol = NT1"
+            - "-g"
+            - "client min protocol = NT1"
+            - "-g"
+            - "ntlm auth = yes"
           env:
             - name: TZ
               value: "UTC"
