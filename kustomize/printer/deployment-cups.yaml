@@ -57,6 +57,8 @@ spec:
               mountPath: /etc/cups
             - name: cups-services
               mountPath: /etc/avahi/services
+            - name: dbus-socket
+              mountPath: /var/run/dbus
       volumes:
         - name: cups-config
           hostPath:
@@ -66,3 +68,7 @@ spec:
           hostPath:
             path: /srv/cups/services
             type: DirectoryOrCreate
+        - name: dbus-socket
+          hostPath:
+            path: /var/run/dbus
+            type: Directory
