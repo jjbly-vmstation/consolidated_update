@@ -28,6 +28,8 @@ spec:
               value: "admin"
             - name: CUPS_ADMIN_PASSWORD
               value: "adminpassword"
+            - name: ADMIN_PASSWORD
+              value: "adminpassword"
           ports:
             - containerPort: 631
               name: ipp
