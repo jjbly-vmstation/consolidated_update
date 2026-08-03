@@ -17,7 +17,7 @@ spec:
         kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: samba
-          image: ghcr.io/linuxserver/samba:latest
+          image: dperson/samba:latest
           env:
             - name: TZ
               value: "UTC"
