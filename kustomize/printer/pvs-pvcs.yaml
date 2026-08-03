@@ -19,7 +19,7 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -42,7 +42,7 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -65,7 +65,7 @@ spec:
             - key: kubernetes.io/hostname
               operator: In
               values:
-                - storagenodet3500
+                - storagenodet3500.vmstation.local
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
