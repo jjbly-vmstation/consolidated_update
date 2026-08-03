@@ -6,5 +6,4 @@ resources:
   - deployment-samba.yaml
   - deployment-mover.yaml
   - deployment-paperless.yaml
-  - service-paperless.yaml
   - service-samba.yaml
