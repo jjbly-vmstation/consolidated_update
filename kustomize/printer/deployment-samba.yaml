@@ -21,17 +21,19 @@ spec:
         - name: samba
           image: dperson/samba:latest
           args:
-            - "-u"
-            - "scanneruser;scanpass"
-            - "-s"
-            - "ScanShare;/share/ScanShare;yes;no;no;scanneruser"
-            # Enable SMB1/NT1 support for older Brother hardware
+            # 1. Global config parameters FIRST
             - "-g"
             - "server min protocol = NT1"
             - "-g"
             - "client min protocol = NT1"
             - "-g"
             - "ntlm auth = yes"
+            # 2. Add User: username;password
+            - "-u"
+            - "scanneruser;scanpass"
+            # 3. Define Share: sharename;path;browseable;readonly;guest;users
+            - "-s"
+            - "ScanShare;/share/ScanShare;yes;no;no;scanneruser"
           env:
             - name: TZ
               value: "UTC"
