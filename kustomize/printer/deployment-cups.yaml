@@ -13,7 +13,6 @@ spec:
       labels:
         app: cups-avahi
     spec:
-      # hostNetwork is required so Avahi can broadcast mDNS (AirPrint/Bonjour) directly onto your LAN
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
@@ -21,14 +20,34 @@ spec:
       containers:
         - name: cups
           image: ydkn/cups:latest
-          securityContext:
-            privileged: true
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    # 1. Set admin password
+                    echo 'admin:adminpassword' | chpasswd
+
+                    # 2. Wait briefly for cupsd daemon to initialize
+                    sleep 3
+
+                    # 3. Auto-add Brother MFC-9130CW printer queue
+                    lpadmin -p Brother_MFC_9130CW \
+                      -E \
+                      -v socket://192.168.4.72:9100 \
+                      -m raw \
+                      -L "Office" \
+                      -D "Brother MFC-9130CW" \
+                      -o printer-is-shared=true
+
+                    # 4. Set as default system printer
+                    lpadmin -d Brother_MFC_9130CW
           env:
             - name: CUPS_ADMIN_USER
               value: "admin"
             - name: CUPS_ADMIN_PASSWORD
-              value: "adminpassword"
-            - name: ADMIN_PASSWORD
               value: "adminpassword"
           ports:
             - containerPort: 631
@@ -39,8 +58,6 @@ spec:
               mountPath: /etc/cups
             - name: cups-services
               mountPath: /etc/avahi/services
-            - name: usb-dev
-              mountPath: /dev/bus/usb
       volumes:
         - name: cups-config
           hostPath:
@@ -50,6 +67,3 @@ spec:
           hostPath:
             path: /srv/cups/services
             type: DirectoryOrCreate
-        - name: usb-dev
-          hostPath:
-            path: /dev/bus/usb
