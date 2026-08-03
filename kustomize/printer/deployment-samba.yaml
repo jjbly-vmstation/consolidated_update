@@ -18,6 +18,11 @@ spec:
       containers:
         - name: samba
           image: dperson/samba:latest
+          args:
+            - "-u"
+            - "scanneruser;scanpass"
+            - "-s"
+            - "ScanShare;/share/ScanShare;yes;no;no;scanneruser"
           env:
             - name: TZ
               value: "UTC"
@@ -25,10 +30,6 @@ spec:
               value: "1000"
             - name: PGID
               value: "1000"
-            - name: USER
-              value: "scanneruser" # replace with Secret in production
-            - name: PASSWORD
-              value: "scanpass"    # replace with Secret in production
           ports:
             - containerPort: 445
               protocol: TCP
