@@ -56,23 +56,24 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/masternode.yml
 
 Deploys on masternode: BIND9 DNS, rsyslog receiver, node_exporter.
 
-## 6. Set up TLS and internal DNS
+## 6. Set up internal DNS (optional — only needed for public/external cert issuance)
 
-Store the Cloudflare API token in Ansible vault:
+Local access no longer needs this step: every app is reached over plain
+HTTP via avahi mDNS `.local` hostnames (see Service URLs below), not
+`jjbly.uk`. Skip straight to step 7 unless you specifically want public
+HTTPS via cert-manager + Cloudflare for a service.
+
 ```bash
 ansible-vault edit ansible/inventory/secrets.yml
 # Add: vault_cloudflare_api_token: "<your-token>"
-```
-
-Run the cert playbook — creates `jjbly.uk` DNS zone on the Windows DC,
-removes the old `lan` zone, and creates the Cloudflare secret in Kubernetes:
-```bash
 ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-certs.yml --ask-vault-pass
 ```
 
 ## 7. Create application secrets
 
-**Nextcloud** (update passwords before running):
+**Nextcloud** (update passwords before running — see docs/NEXTCLOUD_SSL.md
+for why these values must stay `http`/`masternode.local`, not `https`/
+`jjbly.uk`, or the browser will hit a cert error):
 ```bash
 kubectl create secret generic nextcloud-secrets \
   --from-literal=db-name=nextcloud \
@@ -81,10 +82,10 @@ kubectl create secret generic nextcloud-secrets \
   --from-literal=mariadb-root-password=<ROOT_PASSWORD> \
   --from-literal=admin-user=admin \
   --from-literal=admin-password=<ADMIN_PASSWORD> \
-  --from-literal=trusted-domains="nextcloud.jjbly.uk" \
-  --from-literal=overwriteprotocol=https \
-  --from-literal=overwritehost=nextcloud.jjbly.uk \
-  --from-literal=overwritecliurl=https://nextcloud.jjbly.uk \
+  --from-literal=trusted-domains="masternode.local masternode.local:30301" \
+  --from-literal=overwriteprotocol=http \
+  --from-literal=overwritehost=masternode.local:30301 \
+  --from-literal=overwritecliurl=http://masternode.local:30301 \
   -n nextcloud --dry-run=client -o yaml | kubectl apply -f -
 ```
 
@@ -102,29 +103,30 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
 ```
 
 This installs (in order):
-1. cert-manager (Let's Encrypt controller)
-2. ClusterIssuer (Cloudflare DNS-01)
-3. nginx ingress controller
-4. All app stacks (monitoring, Jellyfin, Nextcloud, Vaultwarden, Homer)
+1. cert-manager + nginx ingress controller (optional infra, kept for possible
+   future public/external exposure — no app currently uses it)
+2. All app stacks: Jellyfin, Nextcloud, Vaultwarden, Homer, nodectl
 
-cert-manager automatically issues Let's Encrypt certs for each service.
-No certificate installation needed on any client device.
+Every app is served over plain HTTP on a fixed NodePort, reached via each
+node's avahi/mDNS `.local` hostname — no TLS, no cert-manager, no
+Cloudflare, no jjbly.uk DNS zone required for local access.
 
 ## 9. Validate
 
 ```bash
 kubectl get nodes
 kubectl get pods -A
-kubectl get certificate -A   # all should show READY=True within ~2 minutes
 ```
 
-## Service URLs (internal DNS via jjbly.uk zone on Windows DC)
+## Service URLs (local mDNS, PC only for now)
 
 | Service | URL |
 |---------|-----|
-| Dashboard | https://home.jjbly.uk |
-| Jellyfin | https://jellyfin.jjbly.uk |
-| Nextcloud | https://nextcloud.jjbly.uk |
-| Vaultwarden | https://vault.jjbly.uk |
-| Grafana | https://grafana.jjbly.uk |
-| Prometheus | https://prometheus.jjbly.uk |
+| Dashboard | http://masternode.local:30300 |
+| Jellyfin | http://storagenodet3500.local:30096 |
+| Nextcloud | http://masternode.local:30301 |
+| Vaultwarden | http://masternode.local:30302 |
+| Paperless-ngx | http://masternode.local:31000 |
+| CUPS | http://masternode.local:30631 |
+| Web Scanner | http://masternode.local:30808 |
+

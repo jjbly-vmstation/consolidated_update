@@ -8,13 +8,20 @@ metadata:
     app: vaultwarden
     app.kubernetes.io/name: vaultwarden
 spec:
-  type: ClusterIP
+  # NodePort so Vaultwarden is reachable at http://masternode.local:30302
+  # via avahi mDNS. Note: without the old path-based ingress, the
+  # /notifications/hub websocket (port 3012) is exposed on its own NodePort
+  # rather than the same origin — live push sync between open clients may
+  # not connect, but login/vault access over 30302 is unaffected.
+  type: NodePort
   ports:
     - name: http
       port: 80
       targetPort: 80
+      nodePort: 30302
     - name: websocket
       port: 3012
       targetPort: 3012
+      nodePort: 30312
   selector:
     app: vaultwarden

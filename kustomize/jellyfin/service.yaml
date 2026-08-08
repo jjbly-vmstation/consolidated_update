@@ -9,10 +9,14 @@ metadata:
     app.kubernetes.io/name: jellyfin
     app.kubernetes.io/component: media-server
 spec:
-  type: ClusterIP
+  # NodePort so Jellyfin is reachable at http://storagenodet3500.local:30096
+  # (also works via any other node's .local hostname) — matches
+  # JELLYFIN_PublishedServerUrl in deployment.yaml.
+  type: NodePort
   ports:
     - port: 8096
       targetPort: 8096
+      nodePort: 30096
       name: http
       protocol: TCP
   selector:

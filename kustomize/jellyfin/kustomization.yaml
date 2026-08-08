@@ -7,7 +7,6 @@ resources:
   - service.yaml
   - persistentvolume.yaml
   - persistentvolumeclaim.yaml
-  - ingress.yaml
 
 images:
   - name: jellyfin/jellyfin

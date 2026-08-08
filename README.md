@@ -69,7 +69,7 @@ ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml
     ├── WAKE_ON_LAN.md
     ├── CISCO_SWITCH.md
     ├── WINDOWS_DC.md       # AD DC setup, WinRM, DNS records
-    ├── NEXTCLOUD_SSL.md    # TODO: AD CS cert integration
+    ├── NEXTCLOUD_SSL.md    # Local http/mDNS access notes (superseded Cloudflare TLS)
     ├── CICD.md             # Self-hosted CI/CD plan (GitHub Actions runner → Gitea Actions)
     └── OFFLINE.md          # Offline/air-gap redeployment plan (5 phases)
 ```
@@ -89,9 +89,9 @@ See [`docs/OFFLINE.md`](docs/OFFLINE.md) for the full plan. Five implementation 
 - **Phase 5** — `ansible-galaxy collection download` → commit `ansible/collections/` for offline install
 
 ### Applications
-1. **Nextcloud SSL** — obtain cert from AD CS, create TLS secret — see `docs/NEXTCLOUD_SSL.md`
-2. **Nextcloud AD SSO** — Kerberos/SAML via AD DC (after SSL)
-3. **Grafana admin password** — replace hardcoded `"admin"` with a Secret
+1. ~~**Nextcloud SSL**~~ — dropped; all apps now use local http via avahi mDNS NodePorts, see `docs/NEXTCLOUD_SSL.md`
+2. **Nextcloud AD SSO** — Kerberos/SAML via AD DC
+3. ~~**Grafana admin password**~~ — moot; monitoring stack (Prometheus/Grafana/Loki) removed, was broken for months (PVs never mounted)
 4. **Jellyfin DNS** — create `jellyfin.lan` A record on AD DC → 192.168.4.61
 5. **WinRM setup** — run `winrm quickconfig` and create `svc-ansible` on homelab before Ansible connects
 

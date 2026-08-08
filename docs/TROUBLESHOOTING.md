@@ -83,9 +83,6 @@ Current paths (all on root filesystem, not on /srv/media):
 | Node | Path |
 |---|---|
 | masternode | `/var/lib/vaultwarden` |
-| masternode | `/srv/monitoring_data/prometheus` |
-| masternode | `/srv/monitoring_data/grafana` |
-| masternode | `/srv/monitoring_data/loki` |
 | storagenodet3500 | `/var/lib/jellyfin/config` |
 | storagenodet3500 | `/var/lib/jellyfin/cache` |
 | storagenodet3500 | `/var/lib/k8s/nextcloud` |
@@ -152,15 +149,10 @@ Intro Skipper is **built into Jellyfin 10.10** — enable it at Dashboard → Pl
 
 ## Prometheus / Grafana
 
-### Node count shows more nodes than exist
+Removed — the monitoring stack (Prometheus, Grafana, Loki, Promtail,
+exporters) was dropped from `kustomize/` after months of the Prometheus and
+Loki StatefulSets sitting stuck in `Unknown`/crash-looping (their PVs pointed
+at an NFS export on storagenodet3500 that was never actually set up, so the
+volumes never mounted). If monitoring comes back in the future, fix that NFS
+export first or switch to local hostPath PVs like the other apps use.
 
-Caused by stale or duplicate scrape targets in `prometheus-config` ConfigMap.
-The cluster has exactly 2 nodes: `masternode` (192.168.4.63) and
-`storagenodet3500` (192.168.4.61). The Windows DC (192.168.4.62) runs no
-Linux exporters and must not appear as a node-exporter target.
-
-After fixing the ConfigMap, apply and restart:
-```bash
-ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
-kubectl rollout restart deployment/prometheus -n monitoring
-```

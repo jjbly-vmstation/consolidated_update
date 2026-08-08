@@ -20,10 +20,6 @@ data:
       icon: mdi-cloud-outline
       style: row
       columns: 4
-    Monitoring:
-      icon: mdi-chart-line
-      style: row
-      columns: 4
     Infrastructure:
       icon: mdi-server-network
       style: row
@@ -61,16 +57,6 @@ data:
             icon: mdi-printer
             target: _blank
 
-    - Monitoring:
-        - Grafana:
-            href: http://masternode.local:30303
-            description: Dashboards & Alerts
-            icon: grafana.png
-        - Prometheus:
-            href: http://masternode.local:30090
-            description: Metrics
-            icon: prometheus.png
-
     - Infrastructure:
         - storagenodet3500:
             href: "#"
@@ -85,12 +71,12 @@ data:
                   label: Status
                   format: text
         - Wake Storage:
-            href: http://masternode.local:30304/wol
+            href: http://masternode.local:8080/wol
             description: Power on storagenodet3500
             icon: mdi-power
             target: _blank
         - Sleep Storage:
-            href: http://masternode.local:30304/shutdown
+            href: http://masternode.local:8080/shutdown
             description: Shutdown storagenodet3500
             icon: mdi-sleep
             target: _blank

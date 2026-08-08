@@ -8,7 +8,6 @@
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags cert-manager
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags ingress
 #   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags jellyfin
-#   ansible-playbook -i ansible/inventory/hosts.yml ansible/playbooks/k8s-apply.yml --tags monitoring
 #
 # First-time setup order:
 #   1. ansible-playbook k8s-certs.yml   (DNS + Cloudflare secret)
@@ -31,9 +30,6 @@
         mode: "0755"
       loop:
         - /var/lib/vaultwarden
-        - /srv/monitoring_data/prometheus
-        - /srv/monitoring_data/grafana
-        - /srv/monitoring_data/loki
       tags: [always]
 
     - name: Create local PV directories on storagenodet3500
@@ -87,12 +83,6 @@
       changed_when: true
       tags: [ingress]
 
-    - name: Apply monitoring stack
-      ansible.builtin.command:
-        cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/monitoring
-      changed_when: true
-      tags: [monitoring]
-
     - name: Apply Jellyfin
       ansible.builtin.command:
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/jellyfin
@@ -122,6 +112,12 @@
         cmd: kubectl --kubeconfig={{ kubeconfig }} apply -k {{ repo_root }}/kustomize/nodectl
       changed_when: true
       tags: [nodectl]
+
+    - name: Remove old monitoring stack (Grafana/Prometheus/Loki dropped — was broken)
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig={{ kubeconfig }} delete namespace monitoring --ignore-not-found
+      changed_when: true
+      tags: [monitoring-teardown]
 
     - name: Show pod status
       ansible.builtin.command:

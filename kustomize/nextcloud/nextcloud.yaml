@@ -1,5 +1,10 @@
 ---
-# SSL from AD DC not yet implemented — see docs/NEXTCLOUD_SSL.md
+# Served locally over plain HTTP via NodePort 30301 (http://masternode.local:30301)
+# using avahi mDNS — no TLS / cert-manager / Cloudflare involved.
+# The nextcloud-secrets Secret must set overwriteprotocol=http and
+# overwritehost/overwritecliurl/trusted-domains to masternode.local — see
+# docs/NEXTCLOUD_SSL.md. Getting this wrong is what causes the browser to be
+# redirected to https:// on a port with no TLS listener (cert/connection error).
 apiVersion: apps/v1
 kind: Deployment
 metadata:

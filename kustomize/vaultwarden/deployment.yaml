@@ -31,7 +31,7 @@ spec:
           image: vaultwarden/server:latest
           env:
             - name: DOMAIN
-              value: "https://vault.lan"
+              value: "http://masternode.local:30302"
             - name: WEBSOCKET_ENABLED
               value: "true"
             - name: SIGNUPS_ALLOWED

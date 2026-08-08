@@ -25,10 +25,13 @@ metadata:
     app.kubernetes.io/name: nextcloud
     app.kubernetes.io/component: app
 spec:
-  type: ClusterIP
+  # NodePort so Nextcloud is reachable at http://masternode.local:30301
+  # from any node's local mDNS hostname — see docs/NEXTCLOUD_SSL.md
+  type: NodePort
   ports:
     - name: http
       port: 80
       targetPort: 80
+      nodePort: 30301
   selector:
     app: nextcloud
