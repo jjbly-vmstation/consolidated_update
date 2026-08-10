@@ -68,7 +68,6 @@ spec:
             - name: jellyfin-media
               mountPath: /media
               readOnly: true
-              mountPropagation: HostToContainer
           resources:
             requests:
               cpu: "2"
@@ -116,6 +115,6 @@ spec:
             claimName: jellyfin-cache-pvc
         - name: jellyfin-media
           hostPath:
-            path: /mnt/media
+            path: /srv/media
             type: Directory
       restartPolicy: Always
