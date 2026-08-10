@@ -57,6 +57,9 @@ spec:
               mountPath: /etc/cups
             - name: cups-services
               mountPath: /etc/avahi/services
+            - name: airprint-service
+              mountPath: /etc/avahi/services/airprint.service
+              subPath: airprint.service
             - name: dbus-socket
               mountPath: /var/run/dbus
       volumes:
@@ -68,6 +71,9 @@ spec:
           hostPath:
             path: /srv/cups/services
             type: DirectoryOrCreate
+        - name: airprint-service
+          configMap:
+            name: avahi-airprint-config
         - name: dbus-socket
           hostPath:
             path: /var/run/dbus

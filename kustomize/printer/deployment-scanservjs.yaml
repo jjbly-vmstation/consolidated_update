@@ -13,15 +13,21 @@ spec:
       labels:
         app: scanservjs
     spec:
+      # Custom image (below) only exists in containerd's local store on
+      # storagenodet3500 - no registry involved - so the pod must land
+      # there or imagePullPolicy: Never will make it fail to schedule.
+      nodeSelector:
+        kubernetes.io/hostname: storagenodet3500.vmstation.local
       containers:
         - name: scanservjs
-          image: sbs20/scanservjs:latest
+          # Custom image with Brother's brscan4 SANE backend baked in -
+          # see kustomize/printer/scanservjs-brother/. Built locally on
+          # storagenodet3500 via nerdctl/containerd, not pulled from a
+          # registry.
+          image: localhost/scanservjs-brother:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 8080
-          env:
-            # Tell SANE where to find your network scanner directly
-            - name: SANED_NET_HOSTS
-              value: "192.168.4.72" 
           volumeMounts:
             - name: scan-storage
               mountPath: /var/scans

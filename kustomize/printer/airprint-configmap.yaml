@@ -18,7 +18,7 @@ data:
         <txt-record>Transparent=T</txt-record>
         <txt-record>URF=none</txt-record>
         <!-- Replace "Brother_MFC" below with your exact CUPS printer queue name if different -->
-        <txt-record>rp=printers/Brother_MFC</txt-record>
+        <txt-record>rp=printers/Brother_MFC_9130CW</txt-record>
         <txt-record>note=Office Printer</txt-record>
         <txt-record>product=(Brother MFC-9130CW)</txt-record>
         <txt-record>pdl=application/pdf,image/jpeg,image/urf,application/octet-stream</txt-record>
