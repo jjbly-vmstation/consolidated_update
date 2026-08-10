@@ -23,6 +23,7 @@ spec:
         component: media-server
         app.kubernetes.io/name: jellyfin
         app.kubernetes.io/component: media-server
+        app.kubernetes.io/part-of: vmstation
     spec:
       nodeSelector:
         vmstation/role: storage
@@ -114,6 +115,6 @@ spec:
             claimName: jellyfin-cache-pvc
         - name: jellyfin-media
           hostPath:
-            path: /mnt/media
+            path: /srv/media
             type: Directory
       restartPolicy: Always
